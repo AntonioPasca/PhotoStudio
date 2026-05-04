@@ -42,6 +42,7 @@ android {
 dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.material3)
+    implementation(libs.litert)
     val camerax = "1.3.3"
 
     implementation(libs.androidx.core.ktx)
@@ -65,4 +66,5 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:${camerax}")
     implementation("androidx.camera:camera-view:${camerax}")
     implementation("androidx.camera:camera-extensions:${camerax}")
+    implementation("androidx.camera:camera-video:${camerax}")
 }

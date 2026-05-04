@@ -17,7 +17,6 @@ package com.pascagames.photostudio
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -30,6 +29,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -37,29 +38,35 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.viewinterop.AndroidView
 import android.Manifest
-import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
-import android.provider.MediaStore
-import android.util.Log
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
+import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
+import java.io.File
+import android.os.Environment
+import androidx.annotation.RequiresPermission
+import androidx.camera.view.video.AudioConfig
 
 private const val APP_NAME = "PhotoStudio"
-private const val VERSION =  "Ver 0.2.0"
+private const val VERSION =  "Ver 0.2.1"
 
 // ------------------------------------------------------------------------------------------------
 // MainActivity
 // ------------------------------------------------------------------------------------------------
 class MainActivity : ComponentActivity() {
+
+    var photo = Photo()
 
     // --------------------------------------------------------------------------------------------
     // onCreate
@@ -78,25 +85,38 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // --------------------------------------------------------------------------------------------
+    // settings
+    // --------------------------------------------------------------------------------------------
+    fun settings() {
+
+    }
 
     // --------------------------------------------------------------------------------------------
-// MainScreen
-// --------------------------------------------------------------------------------------------
+    // info
+    // --------------------------------------------------------------------------------------------
+    fun info() {
+
+        val intent = Intent(this@MainActivity, InfoActivity::class.java)
+        val bundle = Bundle()
+        bundle.putString("APP", APP_NAME)
+        bundle.putString("VERSION", VERSION)
+        intent.putExtra("main_activity_data", bundle)
+        startActivity(intent)
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // MainScreen
+    // --------------------------------------------------------------------------------------------
     @Composable
     fun MainScreen(modifier: Modifier = Modifier) {
 
         val context = LocalContext.current
+        val controller = rememberCameraController(context)
         val lifecycleOwner = LocalLifecycleOwner.current
 
-        // CameraX Controller
-        val controller = remember {
-            LifecycleCameraController(context).apply {
-                bindToLifecycle(lifecycleOwner)
-                cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-                setEnabledUseCases(
-                    CameraController.IMAGE_CAPTURE or CameraController.VIDEO_CAPTURE
-                )
-            }
+        LaunchedEffect(Unit) {
+            controller.bindToLifecycle(lifecycleOwner)
         }
 
         getCameraPermission()
@@ -121,8 +141,8 @@ class MainActivity : ComponentActivity() {
     }
 
     // --------------------------------------------------------------------------------------------
-// getCameraPermission
-// --------------------------------------------------------------------------------------------
+    // getCameraPermission
+    // --------------------------------------------------------------------------------------------
     @Composable
     fun getCameraPermission(): Boolean {
 
@@ -149,8 +169,49 @@ class MainActivity : ComponentActivity() {
     }
 
     // --------------------------------------------------------------------------------------------
-// CameraPreview
-// --------------------------------------------------------------------------------------------
+    // startRecording
+    // --------------------------------------------------------------------------------------------
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    fun startRecording(
+        controller: LifecycleCameraController,
+        context: Context,
+        onRecStarted: () -> Unit,
+        onRecFinished: () -> Unit
+    ): Recording {
+
+        val file = File(
+            context.getExternalFilesDir(Environment.DIRECTORY_MOVIES),
+            "VID_${System.currentTimeMillis()}.mp4"
+        )
+
+        val outputOptions = FileOutputOptions.Builder(file).build()
+
+        val audioConfig = AudioConfig.create(false)
+
+        val recording = controller.startRecording(
+            outputOptions,
+            audioConfig,
+            ContextCompat.getMainExecutor(context),
+        ) { event: VideoRecordEvent ->
+            when (event) {
+                is VideoRecordEvent.Start -> onRecStarted()
+                is VideoRecordEvent.Finalize -> onRecFinished()
+            }
+        }
+
+        return recording
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // stopRecording
+    // --------------------------------------------------------------------------------------------
+    fun stopRecording(recording: Recording?) {
+        recording?.stop()
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // CameraPreview
+    // --------------------------------------------------------------------------------------------
     @Composable
     fun CameraPreview(
         controller: LifecycleCameraController,
@@ -163,93 +224,43 @@ class MainActivity : ComponentActivity() {
                     scaleType = PreviewView.ScaleType.FILL_CENTER
                 }
             },
-            //this.modifier = modifier
-            //modifier = Modifier.padding(50.dp)
             modifier.fillMaxSize()
         )
     }
 
     // --------------------------------------------------------------------------------------------
-// takePhoto
-// --------------------------------------------------------------------------------------------
-    fun takePhoto(
-        context: Context,
-        controller: LifecycleCameraController
-    ) {
-        val name = "IMG_${System.currentTimeMillis()}.jpg"
-
-        Log.v(TAG, "takePhoto")
-        Log.v(TAG, name)
-
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX")
-        }
-
-        val outputOptions = ImageCapture.OutputFileOptions
-            .Builder(
-                context.contentResolver,
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues
-            )
-            .build()
-
-        controller.takePicture(
-            outputOptions,
-            ContextCompat.getMainExecutor(context),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onError(exc: ImageCaptureException) {
-                    Log.e(TAG, "Error", exc)
-                }
-
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    Log.d(TAG, "Photo saved in: ${output.savedUri}")
-                    Toast.makeText(context, "Photo saved", Toast.LENGTH_SHORT).show()
-                }
+    // rememberCameraController
+    // --------------------------------------------------------------------------------------------
+    @Composable
+    fun rememberCameraController(context: Context): LifecycleCameraController {
+        return remember {
+            LifecycleCameraController(context).apply {
+                cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                setEnabledUseCases(
+                    CameraController.IMAGE_CAPTURE or
+                    CameraController.VIDEO_CAPTURE
+                )
             }
-        )
+        }
     }
 
     // --------------------------------------------------------------------------------------------
-// takeVideo
-// --------------------------------------------------------------------------------------------
-    fun takeVideo() {
-
-    }
-
+    // BottomBar
     // --------------------------------------------------------------------------------------------
-// settings
-// --------------------------------------------------------------------------------------------
-    fun settings() {
-
-    }
-
-    // --------------------------------------------------------------------------------------------
-// info
-// --------------------------------------------------------------------------------------------
-    fun info() {
-
-        val intent = Intent(this@MainActivity, InfoActivity::class.java)
-        val bundle = Bundle()
-        bundle.putString("APP", APP_NAME)
-        bundle.putString("VERSION", VERSION)
-        intent.putExtra("main_activity_data", bundle)
-        startActivity(intent)
-    }
-
-    // --------------------------------------------------------------------------------------------
-// BottomBar
-// --------------------------------------------------------------------------------------------
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     @Composable
     fun BottomBar(controller: LifecycleCameraController) {
+
+        var activeRecording by remember { mutableStateOf<Recording?>(null) }
+        var isRecording by remember { mutableStateOf(false) }
+        val audioConfig = AudioConfig.create(true)
 
         val context = LocalContext.current
 
         NavigationBar {
             NavigationBarItem(
                 selected = true,
-                onClick = { takePhoto(context, controller) },
+                onClick = { photo.takePhoto(context, controller) },
                 icon = {
                     Icon(
                         painterResource(id = R.drawable.camera),
@@ -267,7 +278,20 @@ class MainActivity : ComponentActivity() {
             )
             NavigationBarItem(
                 selected = true,
-                onClick = { takeVideo() },
+                onClick = {
+                    if (!isRecording) {
+                        activeRecording = startRecording(
+                            controller,
+                            context,
+                            onRecStarted = { Toast.makeText(context, "REC", Toast.LENGTH_SHORT).show() },
+                            onRecFinished = { Toast.makeText(context, "Saved Video", Toast.LENGTH_SHORT).show() }
+                        )
+                    }
+                    else {
+                        stopRecording(activeRecording)
+                    }
+                    isRecording = !isRecording
+                },
                 icon = {
                     Icon(
                         painterResource(id = R.drawable.video),
