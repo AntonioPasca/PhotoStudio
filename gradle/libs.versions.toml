@@ -11,6 +11,9 @@ composeBom = "2026.02.01"
 cameraView = "1.6.0"
 material3 = "1.4.0"
 litert = "2.1.4"
+appcompat = "1.7.1"
+preference = "1.2.0"
+material = "1.4.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -30,6 +33,9 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraView" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 litert = { group = "com.google.ai.edge.litert", name = "litert", version.ref = "litert" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-preference = { group = "androidx.preference", name = "preference", version.ref = "preference" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

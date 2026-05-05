@@ -43,6 +43,9 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.material3)
     implementation(libs.litert)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.preference)
+    implementation(libs.material)
     val camerax = "1.3.3"
 
     implementation(libs.androidx.core.ktx)

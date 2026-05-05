@@ -1,16 +1,39 @@
+// --------------------------------------------------------------------------
+// Language:    Kotlin
+//
+// Framework:   Google Jetpack Compose
+//
+// Package:     com.pascagames.photostudio
+//
+// Author:      Antonio Pascarella
+//
+// Version:     Rel. 0.3.0
+//
+// Date:        May 2026
+//
+// Module:      Photo.kt
+// --------------------------------------------------------------------------
 package com.pascagames.photostudio
 
+import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
+import androidx.annotation.RequiresPermission
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.LifecycleCameraController
+import androidx.camera.view.video.AudioConfig
 import androidx.core.content.ContextCompat
+import java.io.File
 
 class Photo {
 
@@ -23,9 +46,6 @@ class Photo {
         beepEnabled: Boolean = true
     ) {
          val name = "IMG_${System.currentTimeMillis()}.jpg"
-
-         Log.v(TAG, "takePhoto")
-         Log.v(TAG, name)
 
          val contentValues = ContentValues().apply {
              put(MediaStore.MediaColumns.DISPLAY_NAME, name)
@@ -54,18 +74,75 @@ class Photo {
                      Toast.makeText(context, "Photo saved", Toast.LENGTH_SHORT).show()
 
                      if (beepEnabled)
-                         playBeep()
+                         playPhotoBeep()
                  }
              }
          )
     }
 
     // --------------------------------------------------------------------------------------------
-    // playBeep
+    // startRecording
     // --------------------------------------------------------------------------------------------
-    fun playBeep() {
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    fun startRecording(
+        controller: LifecycleCameraController,
+        context: Context,
+        beepEnabled: Boolean = true,
+        onRecStarted: () -> Unit,
+        onRecFinished: () -> Unit
+    ): Recording {
+
+        if (beepEnabled)
+            playStartVideoBeep()
+
+        val file = File(
+            context.getExternalFilesDir(Environment.DIRECTORY_MOVIES),
+            "VID_${System.currentTimeMillis()}.mp4"
+        )
+
+        val outputOptions = FileOutputOptions.Builder(file).build()
+
+        val audioConfig = AudioConfig.create(false)
+
+        val recording = controller.startRecording(
+            outputOptions,
+            audioConfig,
+            ContextCompat.getMainExecutor(context),
+        ) { event: VideoRecordEvent ->
+            when (event) {
+                is VideoRecordEvent.Start -> onRecStarted()
+                is VideoRecordEvent.Finalize -> onRecFinished()
+            }
+        }
+        return recording
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // stopRecording
+    // --------------------------------------------------------------------------------------------
+    fun stopRecording(recording: Recording?, beepEnabled: Boolean = true) {
+
+        if (beepEnabled)
+            playStopVideoBeep()
+
+        recording?.stop()
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // playPhotoBeep
+    // --------------------------------------------------------------------------------------------
+    fun playPhotoBeep() {
         val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
         toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 80)
     }
 
+    fun playStartVideoBeep() {
+        val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+        toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
+    }
+
+    fun playStopVideoBeep() {
+        val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+        toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 50)
+    }
 }

@@ -43,9 +43,7 @@ import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
-import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Recording
-import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
@@ -53,13 +51,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
-import java.io.File
-import android.os.Environment
 import androidx.annotation.RequiresPermission
 import androidx.camera.view.video.AudioConfig
 
 private const val APP_NAME = "PhotoStudio"
-private const val VERSION =  "Ver 0.2.1"
+private const val VERSION =  "Ver 0.3.1"
 
 // ------------------------------------------------------------------------------------------------
 // MainActivity
@@ -90,6 +86,12 @@ class MainActivity : ComponentActivity() {
     // --------------------------------------------------------------------------------------------
     fun settings() {
 
+        val intent = Intent(this@MainActivity, SettingsActivity::class.java)
+        /*val bundle = Bundle()
+        bundle.putString("APP", APP_NAME)
+        bundle.putString("VERSION", VERSION)
+        intent.putExtra("main_activity_data", bundle)*/
+        startActivity(intent)
     }
 
     // --------------------------------------------------------------------------------------------
@@ -169,47 +171,6 @@ class MainActivity : ComponentActivity() {
     }
 
     // --------------------------------------------------------------------------------------------
-    // startRecording
-    // --------------------------------------------------------------------------------------------
-    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun startRecording(
-        controller: LifecycleCameraController,
-        context: Context,
-        onRecStarted: () -> Unit,
-        onRecFinished: () -> Unit
-    ): Recording {
-
-        val file = File(
-            context.getExternalFilesDir(Environment.DIRECTORY_MOVIES),
-            "VID_${System.currentTimeMillis()}.mp4"
-        )
-
-        val outputOptions = FileOutputOptions.Builder(file).build()
-
-        val audioConfig = AudioConfig.create(false)
-
-        val recording = controller.startRecording(
-            outputOptions,
-            audioConfig,
-            ContextCompat.getMainExecutor(context),
-        ) { event: VideoRecordEvent ->
-            when (event) {
-                is VideoRecordEvent.Start -> onRecStarted()
-                is VideoRecordEvent.Finalize -> onRecFinished()
-            }
-        }
-
-        return recording
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // stopRecording
-    // --------------------------------------------------------------------------------------------
-    fun stopRecording(recording: Recording?) {
-        recording?.stop()
-    }
-
-    // --------------------------------------------------------------------------------------------
     // CameraPreview
     // --------------------------------------------------------------------------------------------
     @Composable
@@ -280,7 +241,7 @@ class MainActivity : ComponentActivity() {
                 selected = true,
                 onClick = {
                     if (!isRecording) {
-                        activeRecording = startRecording(
+                        activeRecording = photo.startRecording(
                             controller,
                             context,
                             onRecStarted = { Toast.makeText(context, "REC", Toast.LENGTH_SHORT).show() },
@@ -288,13 +249,17 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     else {
-                        stopRecording(activeRecording)
+                        photo.stopRecording(activeRecording)
                     }
                     isRecording = !isRecording
                 },
                 icon = {
+                    var iconId = R.drawable.videoon
+                    if (isRecording)
+                        iconId = R.drawable.videooff
                     Icon(
-                        painterResource(id = R.drawable.video),
+                        //painterResource(id = R.drawable.videoon),
+                        painterResource(id = iconId),
                         contentDescription = null
                     )
                 },
@@ -309,7 +274,6 @@ class MainActivity : ComponentActivity() {
             )
             NavigationBarItem(
                 selected = true,
-
                 onClick = { settings() },
                 icon = {
                     Icon(

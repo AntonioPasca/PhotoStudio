@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.2.0
+// Version:     Rel. 0.3.0
 //
 // Date:        May 2026
 //
@@ -73,7 +73,7 @@ class InfoActivity : ComponentActivity() {
     }
 
     // --------------------------------------------------------------------------------------------
-    // ViewInfo
+    // MainScreen
     // --------------------------------------------------------------------------------------------
     @Composable
     fun MainScreen(app: String?, version: String?, modifier: Modifier = Modifier) {
