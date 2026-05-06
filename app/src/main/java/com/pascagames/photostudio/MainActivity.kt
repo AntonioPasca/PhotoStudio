@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.2.0
+// Version:     Rel. 0.3.0
 //
 // Date:        May 2026
 //
@@ -55,7 +55,7 @@ import androidx.annotation.RequiresPermission
 import androidx.camera.view.video.AudioConfig
 
 private const val APP_NAME = "PhotoStudio"
-private const val VERSION =  "Ver 0.3.1"
+private const val VERSION =  "Ver 0.3.2"
 
 // ------------------------------------------------------------------------------------------------
 // MainActivity
@@ -87,10 +87,6 @@ class MainActivity : ComponentActivity() {
     fun settings() {
 
         val intent = Intent(this@MainActivity, SettingsActivity::class.java)
-        /*val bundle = Bundle()
-        bundle.putString("APP", APP_NAME)
-        bundle.putString("VERSION", VERSION)
-        intent.putExtra("main_activity_data", bundle)*/
         startActivity(intent)
     }
 

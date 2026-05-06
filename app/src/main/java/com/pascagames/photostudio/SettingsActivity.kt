@@ -19,12 +19,24 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
 // --------------------------------------------------------------------------------------------
@@ -33,6 +45,8 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 class SettingsActivity : ComponentActivity() {
 
     private var backToCaller: (Unit) -> Unit = { back() }
+
+
 
     // --------------------------------------------------------------------------------------------
     // onCreate
@@ -67,23 +81,33 @@ class SettingsActivity : ComponentActivity() {
     // --------------------------------------------------------------------------
     @Composable
     fun MainScreen() {
-    //fun MainScreen(viewModel: SettingsViewModel = viewModel()) {
-    //    val settings by viewModel.settings.collectAsState()
 
-        Column {
+        var photoBeepEnabled by remember { mutableStateOf(true) }
+        var videoStartBeepEnabled by remember { mutableStateOf(true) }
+        var videoStopBeepEnabled by remember { mutableStateOf(true) }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 0.dp, 130.dp)
+        ) {
             SettingSwitch(
                 label = "Photo beep",
-                description = "Enable beep when taking a photo",
-                value = true,
-                //onValueChange = { viewModel.setPhotoBeep() }
-                onValueChange = {}
+                description = "(Beep enabled when taking a photo)",
+                value = photoBeepEnabled,
+                onValueChange = {photoBeepEnabled = !photoBeepEnabled}
             )
-
             SettingSwitch(
-                label = "Video beep",
-                value = true,
-                //onValueChange = { viewModel.setStartVideoBeep() }
-                onValueChange = {}
+                label = "Start video beep",
+                description = "(Beep enabled when starting a video)",
+                value = videoStartBeepEnabled,
+                onValueChange = {videoStartBeepEnabled = !videoStartBeepEnabled}
+            )
+            SettingSwitch(
+                label = "Stop video beep",
+                description = "(Beep enabled when stopping a video)",
+                value = videoStopBeepEnabled,
+                onValueChange = {videoStopBeepEnabled = !videoStopBeepEnabled}
             )
         }
     }
