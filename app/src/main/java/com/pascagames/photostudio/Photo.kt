@@ -42,42 +42,41 @@ class Photo {
     // --------------------------------------------------------------------------------------------
     fun takePhoto(
         context: Context,
-        controller: LifecycleCameraController,
-        beepEnabled: Boolean = true
+        controller: LifecycleCameraController
     ) {
-         val name = "IMG_${System.currentTimeMillis()}.jpg"
+        val name = "IMG_${System.currentTimeMillis()}.jpg"
 
-         val contentValues = ContentValues().apply {
-             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-             put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX")
-         }
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX")
+        }
 
-         val outputOptions = ImageCapture.OutputFileOptions
-             .Builder(
-                 context.contentResolver,
-                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                 contentValues
-             )
-             .build()
+        val outputOptions = ImageCapture.OutputFileOptions
+            .Builder(
+                context.contentResolver,
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                contentValues
+            )
+            .build()
 
-         controller.takePicture(
-             outputOptions,
-             ContextCompat.getMainExecutor(context),
-             object : ImageCapture.OnImageSavedCallback {
-                 override fun onError(exc: ImageCaptureException) {
-                     Log.e(TAG, "Error", exc)
-                 }
+        controller.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onError(exc: ImageCaptureException) {
+                    Log.e(TAG, "Error", exc)
+                }
 
-                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                     Log.d(TAG, "Photo saved in: ${output.savedUri}")
-                     Toast.makeText(context, "Photo saved", Toast.LENGTH_SHORT).show()
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    Log.d(TAG, "Photo saved in: ${output.savedUri}")
+                    Toast.makeText(context, "Photo saved", Toast.LENGTH_SHORT).show()
 
-                     if (beepEnabled)
-                         playPhotoBeep()
-                 }
-             }
-         )
+                    if (Settings.photoBeepEnabled)
+                        playPhotoBeep()
+                }
+            }
+        )
     }
 
     // --------------------------------------------------------------------------------------------
@@ -87,12 +86,11 @@ class Photo {
     fun startRecording(
         controller: LifecycleCameraController,
         context: Context,
-        beepEnabled: Boolean = true,
         onRecStarted: () -> Unit,
         onRecFinished: () -> Unit
     ): Recording {
 
-        if (beepEnabled)
+        if (Settings.videoStartBeepEnabled)
             playStartVideoBeep()
 
         val file = File(
@@ -120,9 +118,9 @@ class Photo {
     // --------------------------------------------------------------------------------------------
     // stopRecording
     // --------------------------------------------------------------------------------------------
-    fun stopRecording(recording: Recording?, beepEnabled: Boolean = true) {
+    fun stopRecording(recording: Recording?) {
 
-        if (beepEnabled)
+        if (Settings.videoStopBeepEnabled)
             playStopVideoBeep()
 
         recording?.stop()

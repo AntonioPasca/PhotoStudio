@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
+
 // --------------------------------------------------------------------------------------------
 // InfoActivity
 // --------------------------------------------------------------------------------------------

@@ -20,7 +20,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 
 
-const val TAG = "PHOTO"
+//const val TAG = "PHOTO"
 
 // ------------------------------------------------------------------------------------------------
 // SettingSwitch

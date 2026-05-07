@@ -95,20 +95,36 @@ class SettingsActivity : ComponentActivity() {
                 label = "Photo beep",
                 description = "(Beep enabled when taking a photo)",
                 value = photoBeepEnabled,
-                onValueChange = {photoBeepEnabled = !photoBeepEnabled}
+                onValueChange = {
+                                    photoBeepEnabled = !photoBeepEnabled
+                                    Settings.photoBeepEnabled = photoBeepEnabled
+                }
             )
             SettingSwitch(
                 label = "Start video beep",
                 description = "(Beep enabled when starting a video)",
                 value = videoStartBeepEnabled,
-                onValueChange = {videoStartBeepEnabled = !videoStartBeepEnabled}
+                onValueChange = {
+                                    videoStartBeepEnabled = !videoStartBeepEnabled
+                                    Settings.videoStartBeepEnabled = videoStartBeepEnabled
+                }
             )
             SettingSwitch(
                 label = "Stop video beep",
                 description = "(Beep enabled when stopping a video)",
                 value = videoStopBeepEnabled,
-                onValueChange = {videoStopBeepEnabled = !videoStopBeepEnabled}
+                onValueChange = {
+                                    videoStopBeepEnabled = !videoStopBeepEnabled
+                                    Settings.videoStopBeepEnabled = videoStopBeepEnabled
+                }
             )
         }
     }
+}
+
+object Settings {
+
+    var photoBeepEnabled = true
+    var videoStartBeepEnabled = true
+    var videoStopBeepEnabled = true
 }

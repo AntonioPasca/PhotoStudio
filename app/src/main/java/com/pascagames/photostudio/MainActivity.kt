@@ -55,7 +55,8 @@ import androidx.annotation.RequiresPermission
 import androidx.camera.view.video.AudioConfig
 
 private const val APP_NAME = "PhotoStudio"
-private const val VERSION =  "Ver 0.3.2"
+private const val VERSION =  "Ver 0.3.3"
+const val TAG = "PHOTO"
 
 // ------------------------------------------------------------------------------------------------
 // MainActivity
@@ -254,7 +255,6 @@ class MainActivity : ComponentActivity() {
                     if (isRecording)
                         iconId = R.drawable.videooff
                     Icon(
-                        //painterResource(id = R.drawable.videoon),
                         painterResource(id = iconId),
                         contentDescription = null
                     )
