@@ -74,6 +74,7 @@ class Photo {
 
                     if (Settings.photoBeepEnabled)
                         playPhotoBeep()
+
                 }
             }
         )
@@ -90,8 +91,9 @@ class Photo {
         onRecFinished: () -> Unit
     ): Recording {
 
-        if (Settings.videoStartBeepEnabled)
+        if (Settings.videoStartBeepEnabled) {
             playStartVideoBeep()
+        }
 
         val file = File(
             context.getExternalFilesDir(Environment.DIRECTORY_MOVIES),

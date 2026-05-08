@@ -16,15 +16,12 @@
 package com.pascagames.photostudio
 
 import android.os.Bundle
+import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,7 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
@@ -45,8 +42,6 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 class SettingsActivity : ComponentActivity() {
 
     private var backToCaller: (Unit) -> Unit = { back() }
-
-
 
     // --------------------------------------------------------------------------------------------
     // onCreate
@@ -82,15 +77,25 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     fun MainScreen() {
 
-        var photoBeepEnabled by remember { mutableStateOf(true) }
-        var videoStartBeepEnabled by remember { mutableStateOf(true) }
-        var videoStopBeepEnabled by remember { mutableStateOf(true) }
+        var photoBeepEnabled by remember { mutableStateOf(Settings.photoBeepEnabled) }
+        var photoDelayBeepEnabled by remember { mutableStateOf(Settings.photoDelayBeepEnabled) }
+        var photoPath by remember { mutableStateOf(Settings.photoPath) }
+
+        var videoStartBeepEnabled by remember { mutableStateOf(Settings.videoStartBeepEnabled) }
+        var videoStopBeepEnabled by remember { mutableStateOf(Settings.videoStopBeepEnabled) }
+        var videoPath by remember { mutableStateOf(Settings.videoPath) }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 0.dp, 130.dp)
+                .padding(start = 0.dp, 150.dp)
         ) {
+            // Photo Settings
+            Text(
+                "Photo",
+                style = TextStyle(fontSize = 22.sp)
+            )
+
             SettingSwitch(
                 label = "Photo beep",
                 description = "(Beep enabled when taking a photo)",
@@ -99,6 +104,26 @@ class SettingsActivity : ComponentActivity() {
                                     photoBeepEnabled = !photoBeepEnabled
                                     Settings.photoBeepEnabled = photoBeepEnabled
                 }
+            )
+            SettingSwitch(
+                label = "Photo beep during delay",
+                description = "(Beep enabled before taking a photo)",
+                value = photoDelayBeepEnabled,
+                onValueChange = {
+                    photoDelayBeepEnabled = !photoDelayBeepEnabled
+                    Settings.photoDelayBeepEnabled = photoDelayBeepEnabled
+                }
+            )
+            Text(
+                "Photo path = $photoPath",
+                Modifier.padding(start = 10.dp, top=20.dp),
+            )
+
+            // Video Settings
+            Text(
+                "Video",
+                Modifier.padding(top=30.dp),
+                style = TextStyle(fontSize = 22.sp)
             )
             SettingSwitch(
                 label = "Start video beep",
@@ -118,6 +143,10 @@ class SettingsActivity : ComponentActivity() {
                                     Settings.videoStopBeepEnabled = videoStopBeepEnabled
                 }
             )
+            Text(
+                "Video path = $videoPath",
+                Modifier.padding(start = 20.dp, top=20.dp)
+            )
         }
     }
 }
@@ -125,6 +154,10 @@ class SettingsActivity : ComponentActivity() {
 object Settings {
 
     var photoBeepEnabled = true
+    var photoDelayBeepEnabled = false
+    var photoPath = "Pictures/CameraX"
+
     var videoStartBeepEnabled = true
     var videoStopBeepEnabled = true
+    var videoPath = Environment.DIRECTORY_MOVIES
 }

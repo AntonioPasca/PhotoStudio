@@ -40,6 +40,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -47,15 +49,20 @@ import androidx.camera.video.Recording
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
-import androidx.annotation.RequiresPermission
-import androidx.camera.view.video.AudioConfig
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
 
 private const val APP_NAME = "PhotoStudio"
-private const val VERSION =  "Ver 0.3.3"
+private const val VERSION =  "Ver 0.3.4"
 const val TAG = "PHOTO"
 
 // ------------------------------------------------------------------------------------------------
@@ -74,8 +81,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PhotoStudioTheme {
-                Scaffold(
-                ) { innerPadding ->
+                Scaffold { innerPadding ->
                     MainScreen(modifier = Modifier.padding(innerPadding))
                 }
             }
@@ -113,16 +119,24 @@ class MainActivity : ComponentActivity() {
         val context = LocalContext.current
         val controller = rememberCameraController(context)
         val lifecycleOwner = LocalLifecycleOwner.current
+        var showDelayedPhoto by remember {mutableStateOf(false)}
+
+        if (showDelayedPhoto) {
+            TakeDelayedPhoto(
+                controller = controller,
+                onFinished = {showDelayedPhoto = false})
+        }
 
         LaunchedEffect(Unit) {
             controller.bindToLifecycle(lifecycleOwner)
         }
 
         getCameraPermission()
+        getAudioPermission()
 
         Scaffold(
             bottomBar = {
-                BottomBar(controller)
+                BottomBar(controller,  {showDelayedPhoto = true})
             }
         ) { innerPadding ->
 
@@ -148,6 +162,34 @@ class MainActivity : ComponentActivity() {
         var result = false
         val context = LocalContext.current
         val permission = Manifest.permission.CAMERA
+
+        val permissionLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) {
+                result = true
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            if (ContextCompat.checkSelfPermission(context, permission)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                permissionLauncher.launch(permission)
+            }
+        }
+        return result
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // getAudioPermission
+    // --------------------------------------------------------------------------------------------
+    @Composable
+    fun getAudioPermission(): Boolean {
+
+        var result = false
+        val context = LocalContext.current
+        val permission = Manifest.permission.RECORD_AUDIO
 
         val permissionLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission()
@@ -203,22 +245,66 @@ class MainActivity : ComponentActivity() {
     }
 
     // --------------------------------------------------------------------------------------------
+    // TakeDelayedPhoto
+    // --------------------------------------------------------------------------------------------
+    @Composable
+    fun TakeDelayedPhoto(
+        controller: LifecycleCameraController,
+        onFinished: () -> Unit
+    ) {
+        var delay by remember { mutableIntStateOf(5) }
+        val context = LocalContext.current
+
+        LaunchedEffect(Unit) {
+            while (delay > 0) {
+                delay(1000)
+                delay--
+                if (Settings.photoDelayBeepEnabled) {
+                    val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 20)
+                }
+            }
+
+            photo.takePhoto(context, controller)
+            onFinished()
+        }
+
+        // UI del countdown
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))   // leggero oscuramento
+                .zIndex(10f),                                  // <--- fondamentale
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = delay.toString(),
+                fontSize = 100.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
     // BottomBar
     // --------------------------------------------------------------------------------------------
-    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     @Composable
-    fun BottomBar(controller: LifecycleCameraController) {
+    fun BottomBar(
+        controller: LifecycleCameraController,
+        onPhoto: () -> Unit) {
 
         var activeRecording by remember { mutableStateOf<Recording?>(null) }
         var isRecording by remember { mutableStateOf(false) }
-        val audioConfig = AudioConfig.create(true)
+
+        //val audioConfig = AudioConfig.create(true)
 
         val context = LocalContext.current
 
         NavigationBar {
             NavigationBarItem(
                 selected = true,
-                onClick = { photo.takePhoto(context, controller) },
+                onClick = onPhoto,
                 icon = {
                     Icon(
                         painterResource(id = R.drawable.camera),
