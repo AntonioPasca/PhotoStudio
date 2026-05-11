@@ -13,6 +13,12 @@
 //
 // Module:      Photo.kt
 // --------------------------------------------------------------------------
+// Public Methods
+//      fun takePhoto(context: Context, controller: LifecycleCameraController)
+//      fun startRecording(controller: LifecycleCameraController, context: Context,
+//        onRecStarted: () -> Unit, onRecFinished: () -> Unit): Recording
+//      fun stopRecording(recording: Recording?)
+// --------------------------------------------------------------------------
 package com.pascagames.photostudio
 
 import android.Manifest
@@ -37,9 +43,9 @@ import java.io.File
 
 class Photo {
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // takePhoto
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     fun takePhoto(
         context: Context,
         controller: LifecycleCameraController
@@ -80,9 +86,9 @@ class Photo {
         )
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // startRecording
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startRecording(
         controller: LifecycleCameraController,
@@ -101,7 +107,6 @@ class Photo {
         )
 
         val outputOptions = FileOutputOptions.Builder(file).build()
-
         val audioConfig = AudioConfig.create(false)
 
         val recording = controller.startRecording(
@@ -117,9 +122,9 @@ class Photo {
         return recording
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // stopRecording
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     fun stopRecording(recording: Recording?) {
 
         if (Settings.videoStopBeepEnabled)
@@ -128,19 +133,26 @@ class Photo {
         recording?.stop()
     }
 
-    // --------------------------------------------------------------------------------------------
+    // Private Methods
+    // ----------------------------------------------------------------------
     // playPhotoBeep
-    // --------------------------------------------------------------------------------------------
-    fun playPhotoBeep() {
+    // ----------------------------------------------------------------------
+    private fun playPhotoBeep() {
         val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
         toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 80)
     }
 
+    // ----------------------------------------------------------------------
+    // playStartVideoBeep
+    // ----------------------------------------------------------------------
     fun playStartVideoBeep() {
         val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
         toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
     }
 
+    // ----------------------------------------------------------------------
+    // playStopVideoBeep
+    // ----------------------------------------------------------------------
     fun playStopVideoBeep() {
         val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
         toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 50)

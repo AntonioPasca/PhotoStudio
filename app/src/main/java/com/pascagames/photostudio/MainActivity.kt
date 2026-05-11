@@ -42,6 +42,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -62,19 +63,20 @@ import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
 
 private const val APP_NAME = "PhotoStudio"
-private const val VERSION =  "Ver 0.3.4"
+private const val VERSION =  "Ver 0.3.5"
 const val TAG = "PHOTO"
 
-// ------------------------------------------------------------------------------------------------
+private lateinit var activeRecording: Recording
+// --------------------------------------------------------------------------
 // MainActivity
-// ------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 class MainActivity : ComponentActivity() {
 
     var photo = Photo()
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // onCreate
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -88,18 +90,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // settings
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     fun settings() {
 
         val intent = Intent(this@MainActivity, SettingsActivity::class.java)
         startActivity(intent)
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // info
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     fun info() {
 
         val intent = Intent(this@MainActivity, InfoActivity::class.java)
@@ -110,9 +112,9 @@ class MainActivity : ComponentActivity() {
         startActivity(intent)
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // MainScreen
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     @Composable
     fun MainScreen(modifier: Modifier = Modifier) {
 
@@ -120,6 +122,7 @@ class MainActivity : ComponentActivity() {
         val controller = rememberCameraController(context)
         val lifecycleOwner = LocalLifecycleOwner.current
         var showDelayedPhoto by remember {mutableStateOf(false)}
+        var showDelayedVideo by remember {mutableStateOf(false)}
 
         if (showDelayedPhoto) {
             TakeDelayedPhoto(
@@ -127,16 +130,25 @@ class MainActivity : ComponentActivity() {
                 onFinished = {showDelayedPhoto = false})
         }
 
+        if (showDelayedVideo) {
+            TakeDelayedVideo(
+                controller = controller,
+                onFinished = {showDelayedVideo = false})
+        }
+
         LaunchedEffect(Unit) {
             controller.bindToLifecycle(lifecycleOwner)
         }
 
         getCameraPermission()
-        getAudioPermission()
+    //    getAudioPermission()
 
         Scaffold(
             bottomBar = {
-                BottomBar(controller,  {showDelayedPhoto = true})
+                BottomBar(
+                    controller,
+                    {showDelayedPhoto = true},
+                    onVideo = {showDelayedVideo = true})
             }
         ) { innerPadding ->
 
@@ -153,9 +165,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // getCameraPermission
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     @Composable
     fun getCameraPermission(): Boolean {
 
@@ -181,9 +193,9 @@ class MainActivity : ComponentActivity() {
         return result
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // getAudioPermission
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     @Composable
     fun getAudioPermission(): Boolean {
 
@@ -209,9 +221,9 @@ class MainActivity : ComponentActivity() {
         return result
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // CameraPreview
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     @Composable
     fun CameraPreview(
         controller: LifecycleCameraController,
@@ -228,9 +240,9 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // rememberCameraController
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     @Composable
     fun rememberCameraController(context: Context): LifecycleCameraController {
         return remember {
@@ -244,15 +256,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // TakeDelayedPhoto
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     @Composable
     fun TakeDelayedPhoto(
         controller: LifecycleCameraController,
         onFinished: () -> Unit
     ) {
-        var delay by remember { mutableIntStateOf(5) }
+        var delay by remember { mutableIntStateOf(Settings.photoBeepDelay) }
         val context = LocalContext.current
 
         LaunchedEffect(Unit) {
@@ -273,8 +285,8 @@ class MainActivity : ComponentActivity() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.4f))   // leggero oscuramento
-                .zIndex(10f),                                  // <--- fondamentale
+                .background(Color.Black.copy(alpha = 0.4f))
+                .zIndex(10f),                                   // important!
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -286,20 +298,66 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
+    // TakeDelayedVideo
+    // ----------------------------------------------------------------------
+    @Composable
+    fun TakeDelayedVideo(
+        controller: LifecycleCameraController,
+        onFinished: () -> Unit) {
+        var delay by remember { mutableIntStateOf(Settings.videoBeepDelay) }
+        val context = LocalContext.current
+
+        getAudioPermission()
+
+        LaunchedEffect(Unit) {
+            while (delay > 0) {
+                delay(1000)
+                delay--
+                if (Settings.photoDelayBeepEnabled) {
+                    val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 20)
+                }
+            }
+
+            activeRecording = photo.startRecording(
+                controller, context,
+                onRecStarted = { Toast.makeText(context, "REC", Toast.LENGTH_SHORT).show() },
+                onRecFinished = {
+                    //onFinished()
+                    Toast.makeText(context, "Saved Video", Toast.LENGTH_SHORT).show()
+                }
+            )
+            onFinished()
+        }
+
+        // UI del countdown
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+                .zIndex(10f),                                   // important!
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = delay.toString(),
+                fontSize = 100.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
+    }
+
+    // ----------------------------------------------------------------------
     // BottomBar
-    // --------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     @Composable
     fun BottomBar(
         controller: LifecycleCameraController,
-        onPhoto: () -> Unit) {
+        onPhoto: () -> Unit,
+        onVideo: () -> Unit){
 
-        var activeRecording by remember { mutableStateOf<Recording?>(null) }
         var isRecording by remember { mutableStateOf(false) }
-
-        //val audioConfig = AudioConfig.create(true)
-
-        val context = LocalContext.current
 
         NavigationBar {
             NavigationBarItem(
@@ -322,14 +380,10 @@ class MainActivity : ComponentActivity() {
             )
             NavigationBarItem(
                 selected = true,
+
                 onClick = {
                     if (!isRecording) {
-                        activeRecording = photo.startRecording(
-                            controller,
-                            context,
-                            onRecStarted = { Toast.makeText(context, "REC", Toast.LENGTH_SHORT).show() },
-                            onRecFinished = { Toast.makeText(context, "Saved Video", Toast.LENGTH_SHORT).show() }
-                        )
+                        onVideo()
                     }
                     else {
                         photo.stopRecording(activeRecording)
