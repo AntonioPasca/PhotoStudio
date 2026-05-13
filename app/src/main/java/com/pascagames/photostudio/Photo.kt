@@ -34,6 +34,7 @@ import androidx.annotation.RequiresPermission
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.LifecycleCameraController
@@ -101,12 +102,26 @@ class Photo {
             playStartVideoBeep()
         }
 
-        val file = File(
+        /*val file = File(
             context.getExternalFilesDir(Environment.DIRECTORY_MOVIES),
             "VID_${System.currentTimeMillis()}.mp4"
-        )
+        )*/
+        val name = "VID_${System.currentTimeMillis()}.mp4"
 
-        val outputOptions = FileOutputOptions.Builder(file).build()
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies")
+        }
+
+        val outputOptions = MediaStoreOutputOptions
+            .Builder(
+                context.contentResolver,
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            )
+            .setContentValues(contentValues)
+            .build()
+
         val audioConfig = AudioConfig.create(false)
 
         val recording = controller.startRecording(

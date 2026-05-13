@@ -217,5 +217,5 @@ object Settings {
     var videoStartBeepEnabled = true
     var videoStopBeepEnabled = true
     var videoBeepDelay = 5
-    var videoPath = Environment.DIRECTORY_MOVIES
+    var videoPath = Environment.DIRECTORY_MOVIES!!
 }

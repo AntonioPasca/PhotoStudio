@@ -45,6 +45,7 @@ import android.media.ToneGenerator
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresPermission
 import androidx.camera.core.CameraSelector
 import androidx.camera.video.Recording
 import androidx.camera.view.CameraController
@@ -58,6 +59,7 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
@@ -115,6 +117,7 @@ class MainActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     // MainScreen
     // ----------------------------------------------------------------------
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     @Composable
     fun MainScreen(modifier: Modifier = Modifier) {
 
@@ -123,6 +126,7 @@ class MainActivity : ComponentActivity() {
         val lifecycleOwner = LocalLifecycleOwner.current
         var showDelayedPhoto by remember {mutableStateOf(false)}
         var showDelayedVideo by remember {mutableStateOf(false)}
+        var showVideoProgress by remember {mutableStateOf(false)}
 
         if (showDelayedPhoto) {
             TakeDelayedPhoto(
@@ -133,7 +137,19 @@ class MainActivity : ComponentActivity() {
         if (showDelayedVideo) {
             TakeDelayedVideo(
                 controller = controller,
-                onFinished = {showDelayedVideo = false})
+                onDelayEnded = {showDelayedVideo = false},
+                onRecInProgress = {
+                    showVideoProgress = true
+                    Log.v(TAG, "PROG")
+                },
+                onRecEnded = {
+                    //showDelayedVideo = false
+                    showVideoProgress = false
+                }
+            )
+        }
+        if (showVideoProgress) {
+            ShowRecTime()
         }
 
         LaunchedEffect(Unit) {
@@ -141,14 +157,13 @@ class MainActivity : ComponentActivity() {
         }
 
         getCameraPermission()
-    //    getAudioPermission()
 
         Scaffold(
             bottomBar = {
                 BottomBar(
-                    controller,
                     {showDelayedPhoto = true},
-                    onVideo = {showDelayedVideo = true})
+                    onVideo = {showDelayedVideo = true}
+               )
             }
         ) { innerPadding ->
 
@@ -163,6 +178,25 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    // ----------------------------------------------------------------------
+    // ShowRecTime
+    // ----------------------------------------------------------------------
+    @Composable
+    fun ShowRecTime()
+    {
+        var timeVideo by remember { mutableIntStateOf(0) }
+        LaunchedEffect(Unit) {
+                while(true) {
+                    delay(1000)
+                    timeVideo++
+                    Log.v(TAG, timeVideo.toString())
+
+                }
+        }
+        //Text(timeVideo.toString())
+        Toast.makeText(LocalContext.current, timeVideo.toString(), Toast.LENGTH_SHORT).show()
     }
 
     // ----------------------------------------------------------------------
@@ -301,14 +335,19 @@ class MainActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     // TakeDelayedVideo
     // ----------------------------------------------------------------------
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     @Composable
     fun TakeDelayedVideo(
         controller: LifecycleCameraController,
-        onFinished: () -> Unit) {
+        onDelayEnded:() -> Unit,
+        onRecInProgress: () -> Unit,
+        onRecEnded: () -> Unit) {
+
         var delay by remember { mutableIntStateOf(Settings.videoBeepDelay) }
         val context = LocalContext.current
 
-        getAudioPermission()
+        var showVideoProgress by remember { mutableStateOf(false) }
+        var countVideoProgress by remember { mutableIntStateOf(0) }
 
         LaunchedEffect(Unit) {
             while (delay > 0) {
@@ -320,15 +359,25 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            onRecInProgress()
+
             activeRecording = photo.startRecording(
                 controller, context,
                 onRecStarted = { Toast.makeText(context, "REC", Toast.LENGTH_SHORT).show() },
+                /*onRecStarted = {
+                                    CustomToast(
+                                        "REC",
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .padding(24.dp)
+                                    )
+                                },*/
                 onRecFinished = {
-                    //onFinished()
                     Toast.makeText(context, "Saved Video", Toast.LENGTH_SHORT).show()
+                    onRecEnded()
                 }
             )
-            onFinished()
+            onDelayEnded()
         }
 
         // UI del countdown
@@ -353,7 +402,6 @@ class MainActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     @Composable
     fun BottomBar(
-        controller: LifecycleCameraController,
         onPhoto: () -> Unit,
         onVideo: () -> Unit){
 
@@ -380,7 +428,6 @@ class MainActivity : ComponentActivity() {
             )
             NavigationBarItem(
                 selected = true,
-
                 onClick = {
                     if (!isRecording) {
                         onVideo()
@@ -399,7 +446,11 @@ class MainActivity : ComponentActivity() {
                         contentDescription = null
                     )
                 },
-                label = { Text("Video") },
+                label = {  if (!isRecording)
+                                Text("Video Start")
+                           else
+                                Text("Video Stop")
+                },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.Green,
                     unselectedIconColor = Color.Gray,
