@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.3.0
+// Version:     Rel. 0.4.0
 //
 // Date:        May 2026
 //

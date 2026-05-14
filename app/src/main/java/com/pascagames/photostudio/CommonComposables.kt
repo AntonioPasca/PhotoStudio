@@ -1,4 +1,4 @@
-// --------------------------------------------------------------------------
+// --------------------------------------------------------------------
 // Language:    Kotlin
 //
 // Framework:   Google Jetpack Compose
@@ -7,18 +7,27 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.3.0
+// Version:     Rel. 0.4.0
 //
 // Date:        May 2026
 //
 // Module:      CommonComposables
-// --------------------------------------------------------------------------
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+//  UI Compose Componenents
 //
-// Common Components
-//
-//      SettingSwitch
+//      fun CustomToast(message: String, duration: Long = 1500L)
+//      fun NumericUpDown(value: Int, onValueChange: (Int) -> Unit,
+//                      min: Int,  max: Int)
+//      fun SettingSwitch(label: String, value: Boolean, onValueChange: (Boolean) -> Unit,
+//                        modifier: Modifier = Modifier, description: String? = null
+//      fun TopBar(title: String, callback: (Unit) -> Unit)
+// --------------------------------------------------------------------
 package com.pascagames.photostudio
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,19 +64,12 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 // --------------------------------------------------------------------
-//  Componenents
-//      fun NumericUpDown(value: Int, onValueChange: (Int) -> Unit,
-//                      min: Int,  max: Int)
-//      fun SettingSwitch(label: String, value: Boolean, onValueChange: (Boolean) -> Unit,
-//                        modifier: Modifier = Modifier, description: String? = null
-//      fun TopBar(title: String, callback: (Unit) -> Unit)
+// CustomToast
 // --------------------------------------------------------------------
-
 @Composable
 fun CustomToast(
     message: String,
-    modifier: Modifier = Modifier,
-    duration: Long = 2000L
+    duration: Long = 1500L
 ) {
     var visible by remember { mutableStateOf(true) }
 
@@ -76,23 +78,35 @@ fun CustomToast(
         visible = false
     }
 
-    if (visible) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
         Box(
-            modifier = modifier
-                .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top=160.dp),
+            contentAlignment = Alignment.BottomCenter
         ) {
-            Text(
-                text = message,
-                color = Color.White,
-                fontSize = 16.sp
-            )
+            Box(
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = message,
+                    color = Color.White,
+                    fontSize = 16.sp
+                )
+            }
         }
     }
 }
 
-
-
+// --------------------------------------------------------------------
+// NumericUpDown
+// --------------------------------------------------------------------
 @Composable
 fun NumericUpDown(
     value: Int,

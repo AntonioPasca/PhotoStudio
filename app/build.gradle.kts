@@ -46,7 +46,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.preference)
     implementation(libs.material)
-    val camerax = "1.3.3"
+    val camerax = "1.6.1"
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -66,12 +66,10 @@ dependencies {
 
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
-
-
-    implementation("androidx.camera:camera-core:${camerax}")
-    implementation("androidx.camera:camera-camera2:${camerax}")
-    implementation("androidx.camera:camera-lifecycle:${camerax}")
-    implementation("androidx.camera:camera-view:${camerax}")
-    implementation("androidx.camera:camera-extensions:${camerax}")
-    implementation("androidx.camera:camera-video:${camerax}")
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view.v161)
+    implementation(libs.androidx.camera.extensions1)
+    implementation(libs.androidx.camera.video)
 }

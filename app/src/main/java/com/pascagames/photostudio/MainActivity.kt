@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.3.0
+// Version:     Rel. 0.4.0
 //
 // Date:        May 2026
 //
@@ -42,7 +42,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.ToneGenerator
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresPermission
@@ -59,13 +58,12 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
 
 private const val APP_NAME = "PhotoStudio"
-private const val VERSION =  "Ver 0.3.5"
+private const val VERSION =  "Ver 0.4.0"
 const val TAG = "PHOTO"
 
 private lateinit var activeRecording: Recording
@@ -127,6 +125,7 @@ class MainActivity : ComponentActivity() {
         var showDelayedPhoto by remember {mutableStateOf(false)}
         var showDelayedVideo by remember {mutableStateOf(false)}
         var showVideoProgress by remember {mutableStateOf(false)}
+        var showStartVideoMsg by remember {mutableStateOf(false)}
 
         if (showDelayedPhoto) {
             TakeDelayedPhoto(
@@ -137,19 +136,15 @@ class MainActivity : ComponentActivity() {
         if (showDelayedVideo) {
             TakeDelayedVideo(
                 controller = controller,
-                onDelayEnded = {showDelayedVideo = false},
+                onRecStarted = {showStartVideoMsg = true},
                 onRecInProgress = {
+                    showDelayedVideo = false
                     showVideoProgress = true
-                    Log.v(TAG, "PROG")
                 },
                 onRecEnded = {
-                    //showDelayedVideo = false
                     showVideoProgress = false
                 }
             )
-        }
-        if (showVideoProgress) {
-            ShowRecTime()
         }
 
         LaunchedEffect(Unit) {
@@ -176,6 +171,16 @@ class MainActivity : ComponentActivity() {
                     controller,
                     modifier = Modifier.fillMaxSize()
                 )
+
+                if (showStartVideoMsg) {
+                    CustomToast(
+                        "REC Started",
+                    )
+                }
+
+                if (showVideoProgress) {
+                    ShowRecTime()
+                }
             }
         }
     }
@@ -191,12 +196,30 @@ class MainActivity : ComponentActivity() {
                 while(true) {
                     delay(1000)
                     timeVideo++
-                    Log.v(TAG, timeVideo.toString())
-
                 }
         }
-        //Text(timeVideo.toString())
-        Toast.makeText(LocalContext.current, timeVideo.toString(), Toast.LENGTH_SHORT).show()
+
+        // UI del countdown
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+                .zIndex(10f),                                   // important!
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = formatTime(timeVideo),
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Red
+            )
+        }
+    }
+
+    fun formatTime(seconds: Int): String {
+        val minutes = seconds / 60
+        val secs = seconds % 60
+        return String.format("%02d:%02d", minutes, secs)
     }
 
     // ----------------------------------------------------------------------
@@ -339,15 +362,12 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun TakeDelayedVideo(
         controller: LifecycleCameraController,
-        onDelayEnded:() -> Unit,
+        onRecStarted:    () -> Unit,
         onRecInProgress: () -> Unit,
         onRecEnded: () -> Unit) {
 
         var delay by remember { mutableIntStateOf(Settings.videoBeepDelay) }
         val context = LocalContext.current
-
-        var showVideoProgress by remember { mutableStateOf(false) }
-        var countVideoProgress by remember { mutableIntStateOf(0) }
 
         LaunchedEffect(Unit) {
             while (delay > 0) {
@@ -363,21 +383,12 @@ class MainActivity : ComponentActivity() {
 
             activeRecording = photo.startRecording(
                 controller, context,
-                onRecStarted = { Toast.makeText(context, "REC", Toast.LENGTH_SHORT).show() },
-                /*onRecStarted = {
-                                    CustomToast(
-                                        "REC",
-                                        modifier = Modifier
-                                            .align(Alignment.Center)
-                                            .padding(24.dp)
-                                    )
-                                },*/
+                onRecStarted =  {onRecStarted()},
                 onRecFinished = {
                     Toast.makeText(context, "Saved Video", Toast.LENGTH_SHORT).show()
                     onRecEnded()
                 }
             )
-            onDelayEnded()
         }
 
         // UI del countdown

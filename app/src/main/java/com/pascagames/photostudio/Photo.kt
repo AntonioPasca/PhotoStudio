@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.3.0
+// Version:     Rel. 0.4.0
 //
 // Date:        May 2026
 //
@@ -26,21 +26,18 @@ import android.content.ContentValues
 import android.content.Context
 import android.media.AudioManager
 import android.media.ToneGenerator
-import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresPermission
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
-import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.video.AudioConfig
 import androidx.core.content.ContextCompat
-import java.io.File
 
 class Photo {
 
@@ -94,7 +91,7 @@ class Photo {
     fun startRecording(
         controller: LifecycleCameraController,
         context: Context,
-        onRecStarted: () -> Unit,
+        onRecStarted:  () -> Unit,
         onRecFinished: () -> Unit
     ): Recording {
 
@@ -102,10 +99,6 @@ class Photo {
             playStartVideoBeep()
         }
 
-        /*val file = File(
-            context.getExternalFilesDir(Environment.DIRECTORY_MOVIES),
-            "VID_${System.currentTimeMillis()}.mp4"
-        )*/
         val name = "VID_${System.currentTimeMillis()}.mp4"
 
         val contentValues = ContentValues().apply {
