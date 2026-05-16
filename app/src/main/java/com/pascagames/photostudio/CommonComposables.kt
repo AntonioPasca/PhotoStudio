@@ -7,12 +7,11 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.4.0
+// Version:     Rel. 0.5.0
 //
 // Date:        May 2026
 //
 // Module:      CommonComposables
-// --------------------------------------------------------------------
 // --------------------------------------------------------------------
 //  UI Compose Componenents
 //

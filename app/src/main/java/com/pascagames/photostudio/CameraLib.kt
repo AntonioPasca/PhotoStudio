@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.4.0
+// Version:     Rel. 0.5.0
 //
 // Date:        May 2026
 //
@@ -16,7 +16,8 @@
 // Public Methods
 //      fun takePhoto(context: Context, controller: LifecycleCameraController)
 //      fun startRecording(controller: LifecycleCameraController, context: Context,
-//        onRecStarted: () -> Unit, onRecFinished: () -> Unit): Recording
+//              onRecStarted: () -> Unit,
+//              onRecFinished: () -> Unit): Recording
 //      fun stopRecording(recording: Recording?)
 // --------------------------------------------------------------------------
 package com.pascagames.photostudio
@@ -24,6 +25,8 @@ package com.pascagames.photostudio
 import android.Manifest
 import android.content.ContentValues
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.provider.MediaStore
@@ -32,14 +35,21 @@ import android.widget.Toast
 import androidx.annotation.RequiresPermission
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.video.AudioConfig
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.delay
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
-class Photo {
+class CameraLib {
 
     // ----------------------------------------------------------------------
     // takePhoto
@@ -82,6 +92,35 @@ class Photo {
                 }
             }
         )
+    }
+
+    // ----------------------------------------------------------------------
+    // takeMultiplePhotos
+    // ----------------------------------------------------------------------
+    // Input
+    //      context: Context
+    //      imageCapture: ImageCapture
+    //      count: Int                          Num of photos to capture
+    //      delayMS: Long = 500L                Delay between successive photos
+    //
+    //  Output
+    //      results: List<Bitmaps>
+    // ----------------------------------------------------------------------
+    suspend fun takeMultiplePhotos(
+        context: Context,
+        imageCapture: ImageCapture,
+        count: Int,
+        delayMs: Long = 500L
+    ): List<Bitmap> {
+        val results = mutableListOf<Bitmap>()
+
+        repeat(count) {
+            val bitmap = captureBitmap(imageCapture, context)
+            results.add(bitmap)
+            delay(delayMs)
+        }
+
+        return results
     }
 
     // ----------------------------------------------------------------------
@@ -142,6 +181,41 @@ class Photo {
     }
 
     // Private Methods
+
+    // ----------------------------------------------------------------------
+    // captureBitmap
+    // ----------------------------------------------------------------------
+    suspend fun captureBitmap(
+                                imageCapture: ImageCapture,
+                                context:Context
+        ): Bitmap = suspendCoroutine { cont ->
+            imageCapture.takePicture(
+                ContextCompat.getMainExecutor(context),
+                object : ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) {
+                        val bitmap = image.toBitmap()
+                        image.close()
+                        cont.resume(bitmap)
+                    }
+
+                    override fun onError(exc: ImageCaptureException) {
+                        cont.resumeWithException(exc)
+                    }
+                }
+            )
+        }
+
+    // ----------------------------------------------------------------------
+    // ImageProxy.toBitmap
+    // ----------------------------------------------------------------------
+    fun ImageProxy.toBitmap(): Bitmap {
+        val plane = planes[0]
+        val buffer = plane.buffer
+        val bytes = ByteArray(buffer.remaining())
+        buffer.get(bytes)
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    }
+
     // ----------------------------------------------------------------------
     // playPhotoBeep
     // ----------------------------------------------------------------------
