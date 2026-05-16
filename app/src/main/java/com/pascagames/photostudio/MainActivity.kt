@@ -38,7 +38,7 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
 
 private const val APP_NAME = "PhotoStudio"
-private const val VERSION =  "Ver 0.5.0"
+private const val VERSION =  "Ver 0.5.1"
 const val TAG = "PHOTO"
 
 // --------------------------------------------------------------------------
@@ -121,22 +121,21 @@ class MainActivity : ComponentActivity() {
                 Image(
                     painter = painterResource(id = R.drawable.moon),
                     contentDescription = null,
-                    modifier = Modifier.padding(start = 0.dp, top = 50.dp)
+                    modifier = Modifier.padding(start = 0.dp, top = 350.dp)
                 )
-
                 Text(
                     text = "PhotoStudio",
                     fontSize = 60.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Blue,
-                    modifier = Modifier.padding(start = 30.dp, top = 400.dp)
+                    modifier = Modifier.padding(start = 30.dp, top = 80.dp)
                 )
                 Text(
                     text = VERSION,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Blue,
-                    modifier = Modifier.padding(start = 130.dp, top = 500.dp)
+                    modifier = Modifier.padding(start = 130.dp, top = 180.dp)
                 )
             }
         }
@@ -172,7 +171,7 @@ class MainActivity : ComponentActivity() {
                 onClick = {callVideoActivity()},
                 icon = {
                     Icon(
-                        painterResource(id = R.drawable.settings),
+                        painterResource(id = R.drawable.movie),
                         contentDescription = null
                     )
                 },
