@@ -92,6 +92,7 @@ class PhotoActivity : ComponentActivity() {
         val lifecycleOwner = LocalLifecycleOwner.current
         var showSinglePhoto by remember {mutableStateOf(false)}
         var showMultiplePhotos by remember {mutableStateOf(false)}
+        var showStacking by remember {mutableStateOf(false)}
 
         if (showSinglePhoto) {
             TakeSinglePhoto(
@@ -102,7 +103,11 @@ class PhotoActivity : ComponentActivity() {
         if (showMultiplePhotos) {
             TakeMultiplePhotos(
                 controller = controller,
-                onFinished = {showSinglePhoto = false})
+                onFinished = {showMultiplePhotos = false})
+        }
+
+        if (showStacking) {
+            cameraLib.executeStacking(context, Settings.photoPath)
         }
 
         LaunchedEffect(Unit) {
@@ -115,7 +120,8 @@ class PhotoActivity : ComponentActivity() {
             bottomBar = {
                 BottomBar(
                     {showSinglePhoto = true},
-                    onMultiplePhotos = {showMultiplePhotos = true}
+                    onMultiplePhotos = {showMultiplePhotos = true},
+                    onStacking = {showStacking = true}
                )
             }
         ) { innerPadding ->
@@ -180,7 +186,41 @@ class PhotoActivity : ComponentActivity() {
         controller: LifecycleCameraController,
         onFinished: () -> Unit
     ) {
+        var delay by remember { mutableIntStateOf(Settings.photoBeepDelay) }
+        val context = LocalContext.current
 
+        LaunchedEffect(Unit) {
+            while (delay > 0) {
+                delay(1000)
+                delay--
+                if (Settings.photoDelayBeepEnabled) {
+                    val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 20)
+                }
+            }
+
+            for (i in 0 until 3) {
+                cameraLib.takePhoto(context, controller)
+                delay(200)
+            }
+            onFinished()
+        }
+
+        // UI countdown
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+                .zIndex(10f),                                   // important!
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = delay.toString(),
+                fontSize = 100.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
     }
 
     // ----------------------------------------------------------------------
@@ -189,7 +229,8 @@ class PhotoActivity : ComponentActivity() {
     @Composable
     fun BottomBar(
         onPhoto: () -> Unit,
-        onMultiplePhotos: () -> Unit){
+        onMultiplePhotos: () -> Unit,
+        onStacking: () ->Unit){
 
         NavigationBar {
             NavigationBarItem(
@@ -221,6 +262,25 @@ class PhotoActivity : ComponentActivity() {
                     )
                 },
                 label = { Text("Multiple Photos") },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.Green,
+                    unselectedIconColor = Color.White,
+                    selectedTextColor = Color.White,
+                    unselectedTextColor = Color.Gray,
+                    indicatorColor = Color.Transparent
+                )
+            )
+
+            NavigationBarItem(
+                selected = true,
+                onClick = onStacking,
+                icon = {
+                    Icon(
+                        painterResource(id = R.drawable.photos),
+                        contentDescription = null
+                    )
+                },
+                label = { Text("Stacking") },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.Green,
                     unselectedIconColor = Color.White,

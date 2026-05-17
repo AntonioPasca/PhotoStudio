@@ -26,6 +26,7 @@
 package com.pascagames.photostudio
 
 import android.Manifest
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
@@ -33,6 +34,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
@@ -42,7 +44,6 @@ import androidx.annotation.RequiresPermission
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.ImageProxy
 import androidx.camera.core.ZoomState
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Recording
@@ -70,10 +71,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import kotlinx.coroutines.delay
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
+import androidx.core.graphics.get
+import androidx.core.graphics.set
+import androidx.core.graphics.createBitmap
+
 
 class CameraLib {
 
@@ -210,35 +211,6 @@ class CameraLib {
     }
 
     // ----------------------------------------------------------------------
-    // takeMultiplePhotos
-    // ----------------------------------------------------------------------
-    // Input
-    //      context: Context
-    //      imageCapture: ImageCapture
-    //      count: Int                          Num of photos to capture
-    //      delayMS: Long = 500L                Delay between successive photos
-    //
-    //  Output
-    //      results: List<Bitmaps>
-    // ----------------------------------------------------------------------
-    suspend fun takeMultiplePhotos(
-        context: Context,
-        imageCapture: ImageCapture,
-        count: Int,
-        delayMs: Long = 500L
-    ): List<Bitmap> {
-        val results = mutableListOf<Bitmap>()
-
-        repeat(count) {
-            val bitmap = captureBitmap(imageCapture, context)
-            results.add(bitmap)
-            delay(delayMs)
-        }
-
-        return results
-    }
-
-    // ----------------------------------------------------------------------
     // startRecording
     // ----------------------------------------------------------------------
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
@@ -295,41 +267,27 @@ class CameraLib {
         recording?.stop()
     }
 
-    // Private Methods
+    // ----------------------------------------------------------------------
+    // executeStacking
+    // ----------------------------------------------------------------------
+    // Todo
+    //      più veloce (con buffer preallocati)
+    //      più preciso (stacking a colori, non solo grayscale)
+    //      più “astro” (sigma‑clipping, dark frame, flat field)
+    // ----------------------------------------------------------------------
+    fun executeStacking(
+        context: Context,
+        folder: String
+    ) {
 
-    // ----------------------------------------------------------------------
-    // captureBitmap
-    // ----------------------------------------------------------------------
-    suspend fun captureBitmap(
-                                imageCapture: ImageCapture,
-                                context:Context
-        ): Bitmap = suspendCoroutine { cont ->
-            imageCapture.takePicture(
-                ContextCompat.getMainExecutor(context),
-                object : ImageCapture.OnImageCapturedCallback() {
-                    override fun onCaptureSuccess(image: ImageProxy) {
-                        val bitmap = image.toBitmap()
-                        image.close()
-                        cont.resume(bitmap)
-                    }
-
-                    override fun onError(exc: ImageCaptureException) {
-                        cont.resumeWithException(exc)
-                    }
-                }
-            )
-        }
-
-    // ----------------------------------------------------------------------
-    // ImageProxy.toBitmap
-    // ----------------------------------------------------------------------
-    fun ImageProxy.toBitmap(): Bitmap {
-        val plane = planes[0]
-        val buffer = plane.buffer
-        val bytes = ByteArray(buffer.remaining())
-        buffer.get(bytes)
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        val bitmaps = loadBitmapsFromFolder(context, folder)
+        val arrays = bitmaps.map { bitmapToFloatArray(it) }
+        val stacked = stackMedian(arrays)   // oppure stackAverage
+        val finalBitmap = floatArrayToBitmap(stacked)
+        saveBitmapToGallery(context, finalBitmap, "stacked.jpg", folder)
     }
+
+    // Private Methods
 
     // ----------------------------------------------------------------------
     // playPhotoBeep
@@ -353,5 +311,165 @@ class CameraLib {
     fun playStopVideoBeep() {
         val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
         toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 50)
+    }
+
+    // ----------------------------------------------------------------------
+    // loadBitmapsFromFolder
+    // ----------------------------------------------------------------------
+    // Loads all the bitmaps from a given folder
+    //
+    //  Input
+    //      context: Context
+    //      folder: String
+    //
+    //  Output
+    //      bitmaps: List<Bitmap>
+    // ----------------------------------------------------------------------
+    fun loadBitmapsFromFolder(context: Context, folder: String): List<Bitmap> {
+        val bitmaps = mutableListOf<Bitmap>()
+        val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+
+        val projection = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.RELATIVE_PATH
+        )
+
+        val selection = "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
+        val selectionArgs = arrayOf("%$folder%")
+
+        context.contentResolver.query(
+            collection,
+            projection,
+            selection,
+            selectionArgs,
+            null
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idColumn)
+                val uri = ContentUris.withAppendedId(collection, id)
+                val bmp = BitmapFactory.decodeStream(
+                    context.contentResolver.openInputStream(uri)
+                )
+                bitmaps.add(bmp)
+            }
+        }
+
+        return bitmaps
+    }
+
+    // ----------------------------------------------------------------------
+    // bitmapToFloatArray
+    // ----------------------------------------------------------------------
+    fun bitmapToFloatArray(bmp: Bitmap): Array<FloatArray> {
+        val w = bmp.width
+        val h = bmp.height
+        val arr = Array(h) { FloatArray(w) }
+
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val pixel = bmp[x, y]
+                val gray = (android.graphics.Color.red(pixel) +
+                        android.graphics.Color.green(pixel) +
+                        android.graphics.Color.blue(pixel)) / 3f
+                arr[y][x] = gray
+            }
+        }
+        return arr
+    }
+
+    // ----------------------------------------------------------------------
+    // saveBitmapToGallery
+    // ----------------------------------------------------------------------
+    fun saveBitmapToGallery(
+        context: Context,
+        bitmap: Bitmap,
+        filename: String = "stacked_${System.currentTimeMillis()}.jpg",
+        folder: String
+    ): Uri? {
+
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, folder)
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+        }
+
+        val uri = context.contentResolver.insert(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            contentValues
+        ) ?: return null
+
+        context.contentResolver.openOutputStream(uri)?.use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
+        }
+
+        contentValues.clear()
+        contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+        context.contentResolver.update(uri, contentValues, null, null)
+
+        return uri
+    }
+
+    // ----------------------------------------------------------------------
+    // stackAverage
+    // ----------------------------------------------------------------------
+    fun stackAverage(images: List<Array<FloatArray>>): Array<FloatArray> {
+        val h = images[0].size
+        val w = images[0][0].size
+        val result = Array(h) { FloatArray(w) }
+
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                var sum = 0f
+                for (img in images) {
+                    sum += img[y][x]
+                }
+                result[y][x] = sum / images.size
+            }
+        }
+        return result
+    }
+
+    // ----------------------------------------------------------------------
+    // stackMedian
+    // ----------------------------------------------------------------------
+    fun stackMedian(images: List<Array<FloatArray>>): Array<FloatArray> {
+        val h = images[0].size
+        val w = images[0][0].size
+        val result = Array(h) { FloatArray(w) }
+
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val values = FloatArray(images.size)
+
+                for (i in images.indices) {
+                    values[i] = images[i][y][x]
+                }
+
+                values.sort()
+                result[y][x] = values[values.size / 2]
+            }
+        }
+        return result
+    }
+
+    // ----------------------------------------------------------------------
+    // stackMedian
+    // ----------------------------------------------------------------------
+    fun floatArrayToBitmap(arr: Array<FloatArray>): Bitmap {
+        val h = arr.size
+        val w = arr[0].size
+        val bmp = createBitmap(w, h)
+
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val v = arr[y][x].coerceIn(0f, 255f).toInt()
+                bmp[x, y] = android.graphics.Color.rgb(v, v, v)
+            }
+        }
+        return bmp
     }
 }
