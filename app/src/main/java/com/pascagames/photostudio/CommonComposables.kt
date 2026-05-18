@@ -126,7 +126,7 @@ fun NumericUpDown(
         IconButton(
             onClick = { if (value > min) onValueChange(value - 1) }
         ) {
-            Icon(Icons.Default.Remove, contentDescription = "Decrementa")
+            Icon(Icons.Default.Remove, contentDescription = "Decrement")
         }
 
         Text(
@@ -137,7 +137,7 @@ fun NumericUpDown(
         IconButton(
             onClick = { if (value < max) onValueChange(value + 1) }
         ) {
-            Icon(Icons.Default.Add, contentDescription = "Incrementa")
+            Icon(Icons.Default.Add, contentDescription = "Increment")
         }
     }
 }

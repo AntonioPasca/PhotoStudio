@@ -36,6 +36,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.widget.Toast
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.foundation.background
 import androidx.compose.runtime.mutableStateOf
@@ -90,24 +91,28 @@ class PhotoActivity : ComponentActivity() {
         val context = LocalContext.current
         val controller = cameraLib.rememberCameraController(context)
         val lifecycleOwner = LocalLifecycleOwner.current
-        var showSinglePhoto by remember {mutableStateOf(false)}
-        var showMultiplePhotos by remember {mutableStateOf(false)}
-        var showStacking by remember {mutableStateOf(false)}
+        var doSinglePhoto by remember {mutableStateOf(false)}
+        var doMultiplePhotos by remember {mutableStateOf(false)}
+        var doStacking by remember {mutableStateOf(false)}
 
-        if (showSinglePhoto) {
+        if (doSinglePhoto) {
             TakeSinglePhoto(
                 controller = controller,
-                onFinished = {showSinglePhoto = false})
+                onFinished = {doSinglePhoto = false})
         }
 
-        if (showMultiplePhotos) {
+        if (doMultiplePhotos) {
             TakeMultiplePhotos(
                 controller = controller,
-                onFinished = {showMultiplePhotos = false})
+                onFinishedSingle = {},
+                onFinishedAll = {doMultiplePhotos = false})
         }
 
-        if (showStacking) {
+        if (doStacking) {
+            Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
             cameraLib.executeStacking(context, Settings.photoPath)
+            Toast.makeText(context, "Done", Toast.LENGTH_SHORT).show()
+            doStacking = false
         }
 
         LaunchedEffect(Unit) {
@@ -119,13 +124,12 @@ class PhotoActivity : ComponentActivity() {
         Scaffold(
             bottomBar = {
                 BottomBar(
-                    {showSinglePhoto = true},
-                    onMultiplePhotos = {showMultiplePhotos = true},
-                    onStacking = {showStacking = true}
+                    {doSinglePhoto = true},
+                    onMultiplePhotos = {doMultiplePhotos = true},
+                    onStacking = {doStacking = true}
                )
             }
         ) { innerPadding ->
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -181,17 +185,21 @@ class PhotoActivity : ComponentActivity() {
         }
     }
 
+    // ----------------------------------------------------------------------
+    // TakeMultiplePhotos
+    // ----------------------------------------------------------------------
     @Composable
     fun TakeMultiplePhotos(
         controller: LifecycleCameraController,
-        onFinished: () -> Unit
+        onFinishedSingle: () -> Unit,
+        onFinishedAll: () -> Unit
     ) {
         var delay by remember { mutableIntStateOf(Settings.photoBeepDelay) }
         val context = LocalContext.current
 
         LaunchedEffect(Unit) {
             while (delay > 0) {
-                delay(1000)
+                delay(1000)         // Settings!!!!
                 delay--
                 if (Settings.photoDelayBeepEnabled) {
                     val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
@@ -199,11 +207,12 @@ class PhotoActivity : ComponentActivity() {
                 }
             }
 
-            for (i in 0 until 3) {
+            for (i in 0 until Settings.photoNumMultiple) {
                 cameraLib.takePhoto(context, controller)
                 delay(200)
+                onFinishedSingle()
             }
-            onFinished()
+            onFinishedAll()
         }
 
         // UI countdown
@@ -276,7 +285,7 @@ class PhotoActivity : ComponentActivity() {
                 onClick = onStacking,
                 icon = {
                     Icon(
-                        painterResource(id = R.drawable.photos),
+                        painterResource(id = R.drawable.stacking),
                         contentDescription = null
                     )
                 },

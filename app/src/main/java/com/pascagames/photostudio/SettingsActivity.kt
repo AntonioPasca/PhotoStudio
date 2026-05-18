@@ -139,6 +139,20 @@ class SettingsActivity : ComponentActivity() {
             description =  "Delay (in sec)"
         )
 
+        // Numeric Up-Down - Num of mutiple photos
+        var numMultiplePhotos by remember { mutableIntStateOf(Settings.photoNumMultiple) }
+        NumericUpDown(
+            value = numMultiplePhotos,
+            onValueChange = {
+                delayPhoto = it
+                Settings.photoNumMultiple = numMultiplePhotos
+            },
+            modifier = Modifier.padding(start = 16.dp),
+            min = 1,
+            max = 100,
+            description =  "Num of multiple photos"
+        )
+
         // Location to save photos
         Text(
             "Photo path = $photoPath",
@@ -212,6 +226,7 @@ object Settings {
     var photoBeepEnabled = true
     var photoDelayBeepEnabled = false
     var photoBeepDelay = 5
+    var photoNumMultiple = 3
     var photoPath = "Pictures/CameraX"
 
     var videoStartBeepEnabled = true

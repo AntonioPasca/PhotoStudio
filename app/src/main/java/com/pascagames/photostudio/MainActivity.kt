@@ -38,7 +38,7 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
 
 private const val APP_NAME = "PhotoStudio"
-private const val VERSION =  "Ver 0.5.2"
+private const val VERSION =  "Ver 0.5.3"
 const val TAG = "PHOTO"
 
 // --------------------------------------------------------------------------

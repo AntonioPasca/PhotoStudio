@@ -32,7 +32,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.media.AudioManager
+import android.media.ExifInterface
 import android.media.ToneGenerator
 import android.net.Uri
 import android.provider.MediaStore
@@ -199,7 +201,6 @@ class CameraLib {
                 }
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    Log.d(TAG, "Photo saved in: ${output.savedUri}")
                     Toast.makeText(context, "Photo saved", Toast.LENGTH_SHORT).show()
 
                     if (Settings.photoBeepEnabled)
@@ -279,12 +280,12 @@ class CameraLib {
         context: Context,
         folder: String
     ) {
-
         val bitmaps = loadBitmapsFromFolder(context, folder)
         val arrays = bitmaps.map { bitmapToFloatArray(it) }
         val stacked = stackMedian(arrays)   // oppure stackAverage
         val finalBitmap = floatArrayToBitmap(stacked)
-        saveBitmapToGallery(context, finalBitmap, "stacked.jpg", folder)
+        val name = "Stacked_${System.currentTimeMillis()}.jpg"
+        saveBitmapToGallery(context, finalBitmap, name, folder)
     }
 
     // Private Methods
@@ -350,13 +351,29 @@ class CameraLib {
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val uri = ContentUris.withAppendedId(collection, id)
-                val bmp = BitmapFactory.decodeStream(
+                var bmp = BitmapFactory.decodeStream(
                     context.contentResolver.openInputStream(uri)
                 )
-                bitmaps.add(bmp)
+
+                // Read EXIF
+                val exif = ExifInterface(context.contentResolver.openInputStream(uri)!!)
+                val orientation = exif.getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL
+                )
+
+                Log.v(TAG, "Before rotation")
+                Log.v(TAG, bmp.width.toString())
+                Log.v(TAG, bmp.height.toString())
+                val rotated = when (orientation) {
+                    ExifInterface.ORIENTATION_ROTATE_90 ->  bmp.rotate(90f)
+                    ExifInterface.ORIENTATION_ROTATE_180 -> bmp.rotate(180f)
+                    ExifInterface.ORIENTATION_ROTATE_270 -> bmp.rotate(270f)
+                    else -> bmp
+                }
+                bitmaps.add(rotated)
             }
         }
-
         return bitmaps
     }
 
@@ -457,7 +474,7 @@ class CameraLib {
     }
 
     // ----------------------------------------------------------------------
-    // stackMedian
+    // floatArrayToBitmap
     // ----------------------------------------------------------------------
     fun floatArrayToBitmap(arr: Array<FloatArray>): Bitmap {
         val h = arr.size
@@ -472,4 +489,17 @@ class CameraLib {
         }
         return bmp
     }
+}
+
+// ----------------------------------------------------------------------
+// Bitmap.rotate
+// ----------------------------------------------------------------------
+// Bitmap extension to create a rotation
+// ----------------------------------------------------------------------
+fun Bitmap.rotate(degrees: Float): Bitmap {
+
+    val matrix = Matrix().apply { postRotate(degrees) }
+    val bmp = Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
+
+    return bmp
 }
