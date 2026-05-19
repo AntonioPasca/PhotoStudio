@@ -37,8 +37,8 @@ import androidx.compose.ui.unit.sp
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
 
-private const val APP_NAME = "PhotoStudio"
-private const val VERSION =  "Ver 0.5.3"
+private const val APP_NAME = "AstroPhoto"
+private const val VERSION =  "Ver 0.5.4"
 const val TAG = "PHOTO"
 
 // --------------------------------------------------------------------------
@@ -79,14 +79,6 @@ class MainActivity : ComponentActivity() {
         val intent = Intent(this@MainActivity, VideoActivity::class.java)
         startActivity(intent)
     }
-    // ----------------------------------------------------------------------
-    // settings
-    // ----------------------------------------------------------------------
-    fun settings() {
-
-        val intent = Intent(this@MainActivity, SettingsActivity::class.java)
-        startActivity(intent)
-    }
 
     // ----------------------------------------------------------------------
     // info
@@ -124,17 +116,17 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(start = 0.dp, top = 350.dp)
                 )
                 Text(
-                    text = "PhotoStudio",
+                    text = APP_NAME,
                     fontSize = 60.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Blue,
-                    modifier = Modifier.padding(start = 30.dp, top = 80.dp)
+                    color = Color.Green,
+                    modifier = Modifier.padding(start = 40.dp, top = 80.dp)
                 )
                 Text(
                     text = VERSION,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Blue,
+                    color = Color.Green,
                     modifier = Modifier.padding(start = 130.dp, top = 180.dp)
                 )
             }
@@ -147,6 +139,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun BottomBar() {
 
+        // Photo
         NavigationBar {
             NavigationBarItem(
                 selected = true,
@@ -166,6 +159,8 @@ class MainActivity : ComponentActivity() {
                     indicatorColor = Color.Transparent
                 )
             )
+
+            // Video
             NavigationBarItem(
                 selected = true,
                 onClick = {callVideoActivity()},
@@ -184,25 +179,8 @@ class MainActivity : ComponentActivity() {
                     indicatorColor = Color.Transparent
                 )
             )
-            NavigationBarItem(
-                selected = true,
-                onClick = { settings() },
-                icon = {
-                    Icon(
-                        painterResource(id = R.drawable.settings),
-                        contentDescription = null
-                    )
-                },
-                label = { Text("Settings") },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.Green,
-                    unselectedIconColor = Color.Gray,
-                    selectedTextColor = Color.White,
-                    unselectedTextColor = Color.Gray,
-                    indicatorColor = Color.Transparent
-                )
-            )
 
+            // Info
             NavigationBarItem(
                 selected = true,
                 onClick = { info() },

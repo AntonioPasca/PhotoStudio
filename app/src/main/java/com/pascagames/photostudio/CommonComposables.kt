@@ -39,8 +39,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -57,6 +64,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -185,10 +193,15 @@ fun SettingSwitch(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopBar(title: String, callback: (Unit) -> Unit) {
+
+    var menuExpanded by remember { mutableStateOf(true) }
+
     CenterAlignedTopAppBar(
         title = {
-            Text(title,
-                maxLines = 1)
+            Text(
+                title,
+                maxLines = 1
+            )
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = Color.Blue,
@@ -197,11 +210,112 @@ fun TopBar(title: String, callback: (Unit) -> Unit) {
             actionIconContentColor = Color.White
         ),
         navigationIcon = {
-            IconButton(onClick = {callback(Unit)}) {
+            IconButton(onClick = { callback(Unit) }) {
                 Icon(
                     painter = painterResource(R.drawable.previous),
-                    contentDescription = "")
+                    contentDescription = ""
+                )
             }
         },
     )
 }
+
+
+
+// --------------------------------------------------------------------
+// TopBar
+// --------------------------------------------------------------------
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TopBarEx(
+                title: String,
+                actions: List<TopBarAction>,
+                callback: (Unit) -> Unit) {
+
+    var menuExpanded by remember { mutableStateOf(true) }
+
+    CenterAlignedTopAppBar(
+        title = {
+            Text(
+                title,
+                maxLines = 1
+            )
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.Blue,
+            titleContentColor = Color.White,
+            navigationIconContentColor = Color.White,
+            actionIconContentColor = Color.White
+        ),
+        navigationIcon = {
+            IconButton(onClick = { callback(Unit) }) {
+                Icon(
+                    painter = painterResource(R.drawable.previous),
+                    contentDescription = ""
+                )
+            }
+        },
+
+        actions = {
+            actions.forEach { action ->
+                IconButton(onClick = action.onClick) {
+                    Icon(action.icon, contentDescription = action.label)
+                }
+            }
+        }
+      /*  actions = {
+            // Azione 1: Galleria
+            IconButton(onClick = {}) {
+                Icon(Icons.Default.PhotoLibrary, contentDescription = "Galleria")
+            }
+
+            // Azione 2: Impostazioni
+            IconButton(onClick = {}) {
+                Icon(Icons.Default.Settings, contentDescription = "Impostazioni")
+            }
+
+            // Overflow menu (3 puntini)
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "Altro")
+            }
+
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Aiuto") },
+                    onClick = {
+                        menuExpanded = false
+                        //onHelp()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Info app") },
+                    onClick = {
+                        menuExpanded = false
+                        /* apri schermata info */
+                    }
+                )
+            }
+        }*/
+    )
+}
+
+sealed class TopBarAction(
+    val icon: ImageVector,
+    val label: String,
+    val onClick: () -> Unit
+) {
+    class Gallery(onClick: () -> Unit) :
+        TopBarAction(Icons.Default.PhotoLibrary, "Galleria", onClick)
+
+    class Settings(onClick: () -> Unit) :
+        TopBarAction(Icons.Default.Settings, "Impostazioni", onClick)
+
+    class Help(onClick: () -> Unit) :
+        TopBarAction(Icons.Default.Help, "Aiuto", onClick)
+}
+
+
+

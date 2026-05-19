@@ -17,6 +17,7 @@ package com.pascagames.photostudio
 
 import android.os.Bundle
 import android.os.Environment
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,11 +38,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
+const val SETTINGS_PHOTO_INDEX = 0
+const val SETTINGS_VIDEO_INDEX = 1
+
 // --------------------------------------------------------------------------
 // CLASS SettingsActivity
 // --------------------------------------------------------------------------
 class SettingsActivity : ComponentActivity() {
 
+    private var gSetIndex: Int = 0
     private var backToCaller: (Unit) -> Unit = { back() }
 
     // ----------------------------------------------------------------------
@@ -51,6 +56,11 @@ class SettingsActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+
+        // Get vars from Main
+        val bundle = intent.getBundleExtra("activity_data")
+        gSetIndex = bundle!!.getInt("SETTINGS_INDEX")
 
         setContent {
             PhotoStudioTheme {
@@ -81,8 +91,17 @@ class SettingsActivity : ComponentActivity() {
                 .fillMaxSize()
                 .padding(start = 0.dp, 150.dp)
         ) {
+
+            Log.v(TAG, "SA")
+            Log.v(TAG, gSetIndex.toString())
+
+            if (gSetIndex == SETTINGS_PHOTO_INDEX) {
                 PhotoSettings()
+            }
+
+            if (gSetIndex == SETTINGS_VIDEO_INDEX) {
                 VideoSettings()
+            }
         }
     }
 
@@ -94,6 +113,7 @@ class SettingsActivity : ComponentActivity() {
 
         var photoBeepEnabled by remember { mutableStateOf(Settings.photoBeepEnabled) }
         var photoDelayBeepEnabled by remember { mutableStateOf(Settings.photoDelayBeepEnabled) }
+        var photoStackingBeepEnabled by remember { mutableStateOf(Settings.photoStackingBeepEnabled) }
         var photoPath by remember { mutableStateOf(Settings.photoPath) }
 
         // Photo Settings
@@ -125,6 +145,17 @@ class SettingsActivity : ComponentActivity() {
             }
         )
 
+        // Switch - Beep when stacking is finished
+        SettingSwitch(
+            label = "Stacking beep",
+            description = "(Beep enabled when staking ended)",
+            value = photoStackingBeepEnabled,
+            onValueChange = {
+                photoStackingBeepEnabled = !photoStackingBeepEnabled
+                Settings.photoStackingBeepEnabled = photoStackingBeepEnabled
+            }
+        )
+
         // Numeric Up-Down - Delay in seconds
         var delayPhoto by remember { mutableIntStateOf(Settings.photoBeepDelay) }
         NumericUpDown(
@@ -139,12 +170,12 @@ class SettingsActivity : ComponentActivity() {
             description =  "Delay (in sec)"
         )
 
-        // Numeric Up-Down - Num of mutiple photos
+        // Numeric Up-Down - Num of multiple photos
         var numMultiplePhotos by remember { mutableIntStateOf(Settings.photoNumMultiple) }
         NumericUpDown(
             value = numMultiplePhotos,
             onValueChange = {
-                delayPhoto = it
+                numMultiplePhotos = it
                 Settings.photoNumMultiple = numMultiplePhotos
             },
             modifier = Modifier.padding(start = 16.dp),
@@ -225,6 +256,7 @@ object Settings {
 
     var photoBeepEnabled = true
     var photoDelayBeepEnabled = false
+    var photoStackingBeepEnabled = true
     var photoBeepDelay = 5
     var photoNumMultiple = 3
     var photoPath = "Pictures/CameraX"

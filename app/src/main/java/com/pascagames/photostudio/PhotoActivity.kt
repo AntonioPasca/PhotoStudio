@@ -15,6 +15,7 @@
 // --------------------------------------------------------------------------
 package com.pascagames.photostudio
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -65,9 +66,12 @@ class PhotoActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        val actions = listOf(
+            TopBarAction.Settings { settings() },
+        )
         setContent {
             PhotoStudioTheme {
-                Scaffold(topBar = { TopBar("Photo", backToCaller) })  {
+                Scaffold(topBar = { TopBarEx("Photo", actions, backToCaller) })  {
                     innerPadding ->
                         MainScreen(modifier = Modifier.padding(innerPadding))
                 }
@@ -80,6 +84,18 @@ class PhotoActivity : ComponentActivity() {
     // --------------------------------------------------------------------------
     fun back() {
         finish()
+    }
+
+    // ----------------------------------------------------------------------
+    // settings
+    // ----------------------------------------------------------------------
+    fun settings() {
+
+        val intent = Intent(this@PhotoActivity, SettingsActivity::class.java)
+        val bundle = Bundle()
+        bundle.putInt("SETTINGS_INDEX", SETTINGS_PHOTO_INDEX)
+        intent.putExtra("activity_data", bundle)
+        startActivity(intent)
     }
 
     // ----------------------------------------------------------------------
@@ -111,6 +127,10 @@ class PhotoActivity : ComponentActivity() {
         if (doStacking) {
             Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
             cameraLib.executeStacking(context, Settings.photoPath)
+            if (Settings.photoStackingBeepEnabled) {
+                val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 20)
+            }
             Toast.makeText(context, "Done", Toast.LENGTH_SHORT).show()
             doStacking = false
         }

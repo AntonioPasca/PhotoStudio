@@ -15,11 +15,11 @@
 // --------------------------------------------------------------------------
 package com.pascagames.photostudio
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -35,18 +35,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
-import android.Manifest
-import android.content.pm.PackageManager
+import android.content.Intent
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresPermission
 import androidx.camera.video.Recording
 import androidx.camera.view.LifecycleCameraController
+import androidx.camera.view.video.AudioConfig
 import androidx.compose.foundation.background
 import androidx.compose.runtime.mutableStateOf
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 import androidx.compose.runtime.mutableIntStateOf
@@ -73,9 +70,13 @@ class VideoActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        val actions = listOf(
+            TopBarAction.Settings { settings() }
+        )
+
         setContent {
             PhotoStudioTheme {
-                Scaffold(topBar = { TopBar("Video", backToCaller) }) {
+                Scaffold(topBar = { TopBarEx("Video", actions,backToCaller) }) {
                     innerPadding ->
                         MainScreen(modifier = Modifier.padding(innerPadding))
                 }
@@ -91,25 +92,46 @@ class VideoActivity : ComponentActivity() {
     }
 
     // ----------------------------------------------------------------------
+    // settings
+    // ----------------------------------------------------------------------
+    fun settings() {
+
+        val intent = Intent(this@VideoActivity, SettingsActivity::class.java)
+        val bundle = Bundle()
+        bundle.putInt("SETTINGS_INDEX", SETTINGS_VIDEO_INDEX)
+        intent.putExtra("activity_data", bundle)
+        startActivity(intent)
+    }
+
+    // ----------------------------------------------------------------------
     // MainScreen
     // ----------------------------------------------------------------------
-    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    //@RequiresPermission(Manifest.permission.RECORD_AUDIO)
     @Composable
     fun MainScreen(modifier: Modifier = Modifier) {
 
         val context = LocalContext.current
         val controller = cameraLib.rememberCameraController(context)
         val lifecycleOwner = LocalLifecycleOwner.current
-        var showDelayedVideo by remember {mutableStateOf(false)}
+        var startDelayedVideo by remember {mutableStateOf(false)}
         var showVideoProgress by remember {mutableStateOf(false)}
         var showStartVideoMsg by remember {mutableStateOf(false)}
 
-        if (showDelayedVideo) {
-            TakeDelayedVideo(
+        val permissionsGranted = cameraLib.getAudioPermission() && cameraLib.getCameraPermission()
+        val granted = cameraLib.getAudioPermission()
+
+        //if (granted) {
+        //    val audioConfig = AudioConfig.create(false)
+        //}
+
+        if (startDelayedVideo) {
+
+            StartDelayedVideo(
                 controller = controller,
-                onRecStarted = {showStartVideoMsg = true},
+                permissionsGranted,
+                onRecStarted = { showStartVideoMsg = true },
                 onRecInProgress = {
-                    showDelayedVideo = false
+                    startDelayedVideo = false
                     showVideoProgress = true
                 },
                 onRecEnded = {
@@ -122,12 +144,10 @@ class VideoActivity : ComponentActivity() {
             controller.bindToLifecycle(lifecycleOwner)
         }
 
-        cameraLib.getCameraPermission()
-
         Scaffold(
             bottomBar = {
                 BottomBar(
-                    onVideo = {showDelayedVideo = true}
+                    onVideo = {startDelayedVideo = true}
                )
             }
         ) { innerPadding ->
@@ -187,46 +207,19 @@ class VideoActivity : ComponentActivity() {
     }
 
     // ----------------------------------------------------------------------
-    // getAudioPermission
+    // StartDelayedVideo
     // ----------------------------------------------------------------------
     @Composable
-    fun getAudioPermission(): Boolean {
-
-        var result = false
-        val context = LocalContext.current
-        val permission = Manifest.permission.RECORD_AUDIO
-
-        val permissionLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.RequestPermission()
-        ) { granted ->
-            if (granted) {
-                result = true
-            }
-        }
-
-        LaunchedEffect(Unit) {
-            if (ContextCompat.checkSelfPermission(context, permission)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                permissionLauncher.launch(permission)
-            }
-        }
-        return result
-    }
-
-    // ----------------------------------------------------------------------
-    // TakeDelayedVideo
-    // ----------------------------------------------------------------------
-    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    @Composable
-    fun TakeDelayedVideo(
+    fun StartDelayedVideo(
         controller: LifecycleCameraController,
+        permissionsGranted: Boolean,
         onRecStarted:    () -> Unit,
         onRecInProgress: () -> Unit,
         onRecEnded: () -> Unit) {
 
         var delay by remember { mutableIntStateOf(Settings.videoBeepDelay) }
         val context = LocalContext.current
+        val audioConfig = remember { createSilentAudioConfig() }
 
         LaunchedEffect(Unit) {
             while (delay > 0) {
@@ -240,14 +233,17 @@ class VideoActivity : ComponentActivity() {
 
             onRecInProgress()
 
-            activeRecording = cameraLib.startRecording(
-                controller, context,
-                onRecStarted =  {onRecStarted()},
-                onRecFinished = {
-                    Toast.makeText(context, "Saved Video", Toast.LENGTH_SHORT).show()
-                    onRecEnded()
-                }
-            )
+            if (permissionsGranted) {
+                activeRecording = cameraLib.startRecording(
+                    controller, context,
+                    audioConfig,
+                    onRecStarted = { onRecStarted() },
+                    onRecFinished = {
+                        Toast.makeText(context, "Saved Video", Toast.LENGTH_SHORT).show()
+                        onRecEnded()
+                    }
+                )
+            }
         }
 
         // UI del countdown
@@ -272,7 +268,7 @@ class VideoActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     @Composable
     fun BottomBar(
-        onVideo: () -> Unit){
+        onVideo: () -> Unit) {
 
         var isRecording by remember { mutableStateOf(false) }
 
@@ -283,8 +279,7 @@ class VideoActivity : ComponentActivity() {
                 onClick = {
                     if (!isRecording) {
                         onVideo()
-                    }
-                    else {
+                    } else {
                         cameraLib.stopRecording(activeRecording)
                     }
                     isRecording = !isRecording
@@ -298,10 +293,11 @@ class VideoActivity : ComponentActivity() {
                         contentDescription = null
                     )
                 },
-                label = {  if (!isRecording)
-                                Text("Video Start")
-                           else
-                                Text("Video Stop")
+                label = {
+                    if (!isRecording)
+                        Text("Video Start")
+                    else
+                        Text("Video Stop")
                 },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.Green,
@@ -312,6 +308,18 @@ class VideoActivity : ComponentActivity() {
                 )
             )
         }
+    }
+
+    // ----------------------------------------------------------------------
+    // createSilentAudioConfig
+    // ----------------------------------------------------------------------
+    // It seems CameraX has a bug.
+    // Any call to "AudioConfig.create(false)" in any context
+    // generates a warning
+    // ----------------------------------------------------------------------
+    @SuppressLint("MissingPermission")
+    fun createSilentAudioConfig(): AudioConfig {
+        return AudioConfig.create(false)
     }
 
     @Preview(showBackground = true)

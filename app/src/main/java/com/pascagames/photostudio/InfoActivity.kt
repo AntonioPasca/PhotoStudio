@@ -47,6 +47,7 @@ class InfoActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Get vars from Main
         val bundle = intent.getBundleExtra("main_activity_data")
         val app = bundle!!.getString("APP")
         val version = bundle.getString("VERSION")
