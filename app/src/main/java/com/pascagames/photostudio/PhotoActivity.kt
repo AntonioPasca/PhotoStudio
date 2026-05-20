@@ -219,7 +219,7 @@ class PhotoActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) {
             while (delay > 0) {
-                delay(1000)         // Settings!!!!
+                delay(Settings.delayBetweenPhotos)
                 delay--
                 if (Settings.photoDelayBeepEnabled) {
                     val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)

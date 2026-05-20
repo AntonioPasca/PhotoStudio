@@ -15,6 +15,7 @@
 // --------------------------------------------------------------------------
 // Public Methods
 //      fun CameraPreview(controller: LifecycleCameraController, modifier: Modifier)
+//      fun getAudioPermission(): Boolean
 //      fun getCameraPermission(): Boolean
 //      fun takePhoto(context: Context, controller: LifecycleCameraController)
 //      fun rememberCameraController(context: Context): LifecycleCameraController
@@ -37,6 +38,7 @@ import android.media.AudioManager
 import androidx.exifinterface.media.ExifInterface
 import android.media.ToneGenerator
 import android.net.Uri
+import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
@@ -75,6 +77,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.get
 import androidx.core.graphics.set
 import androidx.core.graphics.createBitmap
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 
 class CameraLib {
@@ -182,7 +187,7 @@ class CameraLib {
     // ----------------------------------------------------------------------
     @Composable
     fun rememberCameraController(context: Context): LifecycleCameraController {
-        val controller =  remember {
+        val controller = remember {
             LifecycleCameraController(context).apply {
                 cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                 setEnabledUseCases(
@@ -241,12 +246,11 @@ class CameraLib {
     // ----------------------------------------------------------------------
     // startRecording
     // ----------------------------------------------------------------------
-    //@RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startRecording(
         controller: LifecycleCameraController,
         context: Context,
         audioConfig: AudioConfig,
-        onRecStarted:  () -> Unit,
+        onRecStarted: () -> Unit,
         onRecFinished: () -> Unit
     ): Recording {
 
@@ -269,9 +273,6 @@ class CameraLib {
             )
             .setContentValues(contentValues)
             .build()
-
-
-        //val audioConfig = AudioConfig.create(false)
 
         val recording = controller.startRecording(
             outputOptions,
@@ -309,25 +310,44 @@ class CameraLib {
         context: Context,
         folder: String
     ) {
-        Log.v(TAG, "ST0")
-        val bitmaps = loadBitmapsFromFolder(context, folder)
+        val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+        val path = File(picturesDir, "CameraX").absolutePath
 
-        Log.v(TAG, "ST1")
-        val buffers = bitmaps.map { bitmapToFloatBuffer(it) }
+        //val dir = File(Settings.photoPath)        // CHECK !!!!!!!!
+        val dir = File(path)
 
-        val w = bitmaps[0].width
-        val h = bitmaps[0].height
-        Log.v(TAG, "ST2")
-        val stacked = stackMedian(buffers, w, h)   // or stackAverage
+        val files = dir.listFiles { f ->
+            f.isFile && (f.extension.lowercase() in listOf("jpg", "jpeg", "png"))
+        } ?: emptyArray()
 
-        Log.v(TAG, "ST3")
-        val finalBitmap = floatArrayToBitmap(stacked, w, h)
+        val bmp = BitmapFactory.decodeFile(files[0].toString())
+        val bmpRotated = fixBitmapRotation(files[0].toString())
 
-        Log.v(TAG, "ST4")
+        val width = bmpRotated.width
+        val height = bmpRotated.height
+        val stacker = Stacker(width, height)
+
+        for ((index, file) in files.withIndex()) {
+
+            val bmpRotated = fixBitmapRotation(file.absolutePath)
+
+            if (bmp != null) {
+                stacker.addFrame(bmpRotated)
+            }
+
+            // 3️⃣ Free memory every 3 images
+            if (index % 3 == 0) {
+                System.gc()
+            }
+        }
+
+        // Final step
+        val resultArray = stacker.buildFinal()
+        val finalBitmap = floatArrayToBitmap(resultArray, width, height)
+
+        // Finally save the stacked image
         val name = "Stacked_${System.currentTimeMillis()}.jpg"
-        saveBitmapToGallery(context, finalBitmap, name, folder)
-
-        Log.v(TAG, "ST5")
+        saveBitmapToGallery(context, finalBitmap, name, Settings.photoPath)
     }
 
     // Private Methods
@@ -355,110 +375,6 @@ class CameraLib {
         val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
         toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 50)
     }
-
-    // ----------------------------------------------------------------------
-    // loadBitmapsFromFolder
-    // ----------------------------------------------------------------------
-    // Loads all the bitmaps from a given folder
-    //
-    //  Input
-    //      context: Context
-    //      folder: String
-    //
-    //  Output
-    //      bitmaps: List<Bitmap>
-    // ----------------------------------------------------------------------
-    fun loadBitmapsFromFolder(context: Context, folder: String): List<Bitmap> {
-        val bitmaps = mutableListOf<Bitmap>()
-        val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-
-        val projection = arrayOf(
-            MediaStore.Images.Media._ID,
-            MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.RELATIVE_PATH
-        )
-
-        val selection = "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
-        val selectionArgs = arrayOf("%$folder%")
-
-        context.contentResolver.query(
-            collection,
-            projection,
-            selection,
-            selectionArgs,
-            null
-        )?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idColumn)
-                val uri = ContentUris.withAppendedId(collection, id)
-                var bmp = BitmapFactory.decodeStream(
-                    context.contentResolver.openInputStream(uri)
-                )
-
-                // Read EXIF
-                val exif = ExifInterface(context.contentResolver.openInputStream(uri)!!)
-                val orientation = exif.getAttributeInt(
-                    ExifInterface.TAG_ORIENTATION,
-                    ExifInterface.ORIENTATION_NORMAL
-                )
-
-                val rotated = when (orientation) {
-                    ExifInterface.ORIENTATION_ROTATE_90 ->  bmp.rotate(90f)
-                    ExifInterface.ORIENTATION_ROTATE_180 -> bmp.rotate(180f)
-                    ExifInterface.ORIENTATION_ROTATE_270 -> bmp.rotate(270f)
-                    else -> bmp
-                }
-                bitmaps.add(rotated)
-            }
-        }
-        return bitmaps
-    }
-
-    // ----------------------------------------------------------------------
-    // bitmapToFloatArray
-    // ----------------------------------------------------------------------
-    /*fun bitmapToFloatArray(bmp: Bitmap): Array<FloatArray> {
-        val w = bmp.width
-        val h = bmp.height
-
-
-        val arr = Array(h) { FloatArray(w) }
-
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                val pixel = bmp[x, y]
-                val gray = (android.graphics.Color.red(pixel) +
-                        android.graphics.Color.green(pixel) +
-                        android.graphics.Color.blue(pixel)) / 3f
-                arr[y][x] = gray
-            }
-        }
-        return arr
-    }*/
-
-    fun bitmapToFloatBuffer(bmp: Bitmap): FloatArray {
-
-        val w = bmp.width
-        val h = bmp.height
-
-        val buffer = FloatArray(w * h)
-
-        var i = 0
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                val pixel = bmp[x, y]
-                val gray = (android.graphics.Color.red(pixel) +
-                            android.graphics.Color.green(pixel) +
-                            android.graphics.Color.blue(pixel)) / 3f
-                buffer[i++] = gray
-            }
-        }
-
-        return buffer
-    }
-
 
     // ----------------------------------------------------------------------
     // saveBitmapToGallery
@@ -495,85 +411,9 @@ class CameraLib {
     }
 
     // ----------------------------------------------------------------------
-    // stackAverage
-    // ----------------------------------------------------------------------
-    fun stackAverage(images: List<Array<FloatArray>>): Array<FloatArray> {
-        val h = images[0].size
-        val w = images[0][0].size
-        val result = Array(h) { FloatArray(w) }
-
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                var sum = 0f
-                for (img in images) {
-                    sum += img[y][x]
-                }
-                result[y][x] = sum / images.size
-            }
-        }
-        return result
-    }
-
-    // ----------------------------------------------------------------------
-    // stackMedian
-    // ----------------------------------------------------------------------
-    /*fun stackMedian(images: List<Array<FloatArray>>): Array<FloatArray> {
-        val h = images[0].size
-        val w = images[0][0].size
-        val result = Array(h) { FloatArray(w) }
-
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                val values = FloatArray(images.size)
-
-                for (i in images.indices) {
-                    values[i] = images[i][y][x]
-                }
-
-                values.sort()
-                result[y][x] = values[values.size / 2]
-            }
-        }
-        return result
-    }*/
-    fun stackMedian(images: List<FloatArray>, width: Int, height: Int): FloatArray {
-        val result = FloatArray(width * height)
-        val temp = FloatArray(images.size)
-
-        for (i in 0 until width * height) {
-            // raccogli i valori dello stesso pixel da tutte le immagini
-            for (imgIndex in images.indices) {
-                temp[imgIndex] = images[imgIndex][i]
-            }
-
-            temp.sort()
-            result[i] = temp[temp.size / 2]
-        }
-
-        return result
-    }
-
-
-    // ----------------------------------------------------------------------
     // floatArrayToBitmap
     // ----------------------------------------------------------------------
-    /*fun floatArrayToBitmap(arr: Array<FloatArray>): Bitmap {
-        val h = arr.size
-        val w = arr[0].size
-        val bmp = createBitmap(w, h)
-
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                val v = arr[y][x].coerceIn(0f, 255f).toInt()
-                bmp[x, y] = android.graphics.Color.rgb(v, v, v)
-            }
-        }
-        return bmp
-    }*/
-}
-
     fun floatArrayToBitmap(buffer: FloatArray, width: Int, height: Int): Bitmap {
-
 
         val bmp = createBitmap(width, height)
 
@@ -589,8 +429,36 @@ class CameraLib {
         return bmp
     }
 
-
     // ----------------------------------------------------------------------
+    // fixBitmapRotation
+    // ----------------------------------------------------------------------
+    fun fixBitmapRotation(path: String): Bitmap {
+        val bmp = BitmapFactory.decodeFile(path)
+
+        val exif = ExifInterface(path)
+        val orientation = exif.getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL
+        )
+
+        val matrix = Matrix()
+
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.preScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.preScale(1f, -1f)
+            else -> return bmp   // nessuna rotazione necessaria
+        }
+
+        val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+        bmp.recycle() // 🔥 libera memoria
+        return rotated
+    }
+}
+
+// ----------------------------------------------------------------------
 // Bitmap.rotate
 // ----------------------------------------------------------------------
 // Bitmap extension to create a rotation
@@ -599,6 +467,77 @@ fun Bitmap.rotate(degrees: Float): Bitmap {
 
     val matrix = Matrix().apply { postRotate(degrees) }
     val bmp = Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
-
     return bmp
+}
+
+// ----------------------------------------------------------------------
+// CLASS Stacker
+// ----------------------------------------------------------------------
+class Stacker(val width: Int, val height: Int) {
+
+    private val buffers = mutableListOf<ByteBuffer>()
+    private val totalPixels = width * height
+
+    // ----------------------------------------------------------------------
+    // addFrame
+    // ----------------------------------------------------------------------
+    fun addFrame(bmp: Bitmap) {
+        val buf = bitmapToGrayByteBuffer(bmp)
+        buffers.add(buf)
+
+        // Call GC every three images
+        if (buffers.size % 3 == 0) {
+            System.gc()
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // buildFinal
+    // ----------------------------------------------------------------------
+    fun buildFinal(): FloatArray {
+        val result = FloatArray(totalPixels)
+        val temp = IntArray(buffers.size)
+
+        for (i in 0 until totalPixels) {
+
+            // Get values from the same pixel from all buffers
+            for (b in buffers.indices) {
+                temp[b] = buffers[b].get(i).toInt() and 0xFF
+            }
+
+            // sort
+            temp.sort()
+
+            // median
+            result[i] = temp[temp.size / 2].toFloat()
+        }
+
+        return result
+    }
+
+    fun bitmapToGrayByteBuffer(bmp: Bitmap): ByteBuffer {
+        val w = bmp.width
+        val h = bmp.height
+
+        val buffer = ByteBuffer.allocateDirect(w * h)
+        buffer.order(ByteOrder.nativeOrder())
+
+        val pixels = IntArray(w * h)
+        bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val gray = (
+                    android.graphics.Color.red(p) +
+                    android.graphics.Color.green(p) +
+                    android.graphics.Color.blue(p)
+            ) / 3
+            buffer.put(gray.toByte())
+        }
+
+        // 🔥 LIBERA SUBITO LA MEMORIA DEL BITMAP
+        bmp.recycle()
+        buffer.rewind()
+        return buffer
+    }
 }

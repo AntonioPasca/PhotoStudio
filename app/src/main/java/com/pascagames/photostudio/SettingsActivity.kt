@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -184,6 +185,20 @@ class SettingsActivity : ComponentActivity() {
             description =  "Num of multiple photos"
         )
 
+        // Numeric Up-Down - Delay between successive photos
+        var delayBetweenPhotos by remember { mutableLongStateOf(Settings.delayBetweenPhotos) }
+        NumericUpDown(
+            value = delayBetweenPhotos.toInt(),
+            onValueChange = {
+                delayBetweenPhotos = it.toLong()
+                Settings.delayBetweenPhotos = delayBetweenPhotos
+            },
+            modifier = Modifier.padding(start = 16.dp),
+            min = 100,
+            max = 5000,
+            description =  "Num of multiple photos"
+        )
+
         // Location to save photos
         Text(
             "Photo path = $photoPath",
@@ -259,6 +274,7 @@ object Settings {
     var photoStackingBeepEnabled = true
     var photoBeepDelay = 5
     var photoNumMultiple = 3
+    var delayBetweenPhotos = 500L    // (in ms)
     var photoPath = "Pictures/CameraX"
 
     var videoStartBeepEnabled = true
