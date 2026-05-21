@@ -35,8 +35,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.widget.Toast
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.foundation.background
@@ -46,6 +44,7 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
@@ -125,14 +124,23 @@ class PhotoActivity : ComponentActivity() {
         }
 
         if (doStacking) {
-            Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
+            // Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
+            Box(modifier = Modifier.fillMaxSize()) {
+            PersistentMessage(
+                "Stacking in progress",
+                modifier = Modifier.align(Alignment.TopCenter)
+                        .padding(top = 250.dp)
+            )
+            if (Settings.photoStackingBeepEnabled) {
+                beep(100,20)
+            }
             cameraLib.executeStacking(context, Settings.photoPath)
             if (Settings.photoStackingBeepEnabled) {
-                val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 20)
+                beep(100,20)
             }
             Toast.makeText(context, "Done", Toast.LENGTH_SHORT).show()
             doStacking = false
+        }
         }
 
         LaunchedEffect(Unit) {
@@ -179,8 +187,7 @@ class PhotoActivity : ComponentActivity() {
                 delay(1000)
                 delay--
                 if (Settings.photoDelayBeepEnabled) {
-                    val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 20)
+                    beep(100,20)
                 }
             }
 
@@ -222,8 +229,7 @@ class PhotoActivity : ComponentActivity() {
                 delay(Settings.delayBetweenPhotos)
                 delay--
                 if (Settings.photoDelayBeepEnabled) {
-                    val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 20)
+                    beep(100,20)
                 }
             }
 

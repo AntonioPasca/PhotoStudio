@@ -27,16 +27,13 @@
 package com.pascagames.photostudio
 
 import android.Manifest
-import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.media.AudioManager
 import androidx.exifinterface.media.ExifInterface
-import android.media.ToneGenerator
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
@@ -74,7 +71,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.get
 import androidx.core.graphics.set
 import androidx.core.graphics.createBitmap
 import java.io.File
@@ -213,7 +209,7 @@ class CameraLib {
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX")
+            put(MediaStore.Images.Media.RELATIVE_PATH, Settings.photoPath)
         }
 
         val outputOptions = ImageCapture.OutputFileOptions
@@ -234,9 +230,8 @@ class CameraLib {
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     Toast.makeText(context, "Photo saved", Toast.LENGTH_SHORT).show()
-
                     if (Settings.photoBeepEnabled)
-                        playPhotoBeep()
+                        beep(100, 80)
 
                 }
             }
@@ -255,7 +250,7 @@ class CameraLib {
     ): Recording {
 
         if (Settings.videoStartBeepEnabled) {
-            playStartVideoBeep()
+            beep(100, 80)
         }
 
         val name = "VID_${System.currentTimeMillis()}.mp4"
@@ -293,7 +288,7 @@ class CameraLib {
     fun stopRecording(recording: Recording?) {
 
         if (Settings.videoStopBeepEnabled)
-            playStopVideoBeep()
+            beep(100, 200)
 
         recording?.stop()
     }
@@ -310,71 +305,57 @@ class CameraLib {
         context: Context,
         folder: String
     ) {
-        val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+        val picturesDir =
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
         val path = File(picturesDir, "CameraX").absolutePath
 
-        //val dir = File(Settings.photoPath)        // CHECK !!!!!!!!
         val dir = File(path)
 
         val files = dir.listFiles { f ->
             f.isFile && (f.extension.lowercase() in listOf("jpg", "jpeg", "png"))
         } ?: emptyArray()
 
-        val bmp = BitmapFactory.decodeFile(files[0].toString())
-        val bmpRotated = fixBitmapRotation(files[0].toString())
+        if (files.isEmpty()) return
 
-        val width = bmpRotated.width
-        val height = bmpRotated.height
+        // Save the first image to get dimensions
+        val refIndex = files.count()/2
+        val firstBmp = fixBitmapRotation(files[refIndex].absolutePath)
+        val width = firstBmp.width
+        val height = firstBmp.height
+
+        Log.v(TAG,"EX_1")
+        Log.v(TAG,refIndex.toString() )
         val stacker = Stacker(width, height)
 
+        // Add all images
         for ((index, file) in files.withIndex()) {
 
             val bmpRotated = fixBitmapRotation(file.absolutePath)
+            stacker.addFrame(bmpRotated)
 
-            if (bmp != null) {
-                stacker.addFrame(bmpRotated)
-            }
-
-            // 3️⃣ Free memory every 3 images
+            // Free memory every three images
             if (index % 3 == 0) {
                 System.gc()
             }
         }
 
-        // Final step
-        val resultArray = stacker.buildFinal()
+        Log.v(TAG,"EX_2")
+        // Compute shifts
+        val shifts = computeShifts(buffers = stacker.buffers, w = width, h = height, maxShift = 50)
+        Log.v(TAG, shifts.toString())
+
+        // Do the final stack
+        val resultArray = stacker.stack(stacker.buffers, shifts, width, height)
+
+        // Convert to bmp
         val finalBitmap = floatArrayToBitmap(resultArray, width, height)
 
-        // Finally save the stacked image
+        // Save
         val name = "Stacked_${System.currentTimeMillis()}.jpg"
         saveBitmapToGallery(context, finalBitmap, name, Settings.photoPath)
     }
 
     // Private Methods
-
-    // ----------------------------------------------------------------------
-    // playPhotoBeep
-    // ----------------------------------------------------------------------
-    private fun playPhotoBeep() {
-        val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-        toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 80)
-    }
-
-    // ----------------------------------------------------------------------
-    // playStartVideoBeep
-    // ----------------------------------------------------------------------
-    fun playStartVideoBeep() {
-        val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-        toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
-    }
-
-    // ----------------------------------------------------------------------
-    // playStopVideoBeep
-    // ----------------------------------------------------------------------
-    fun playStopVideoBeep() {
-        val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-        toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 50)
-    }
 
     // ----------------------------------------------------------------------
     // saveBitmapToGallery
@@ -425,7 +406,6 @@ class CameraLib {
                 bmp[x, y] = color
             }
         }
-
         return bmp
     }
 
@@ -449,12 +429,202 @@ class CameraLib {
             ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
             ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.preScale(-1f, 1f)
             ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.preScale(1f, -1f)
-            else -> return bmp   // nessuna rotazione necessaria
+            else -> return bmp   // Rotation not needed
         }
 
         val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
         bmp.recycle() // 🔥 libera memoria
         return rotated
+    }
+
+    // ----------------------------------------------------------------------
+    // estimateShift
+    // ----------------------------------------------------------------------
+    // Estimates the shift (dxm dy) between two images (represented as
+    // liner FloatArray) in grayscale
+    //
+    //  imageRef    reference image
+    //  img         imagine da align
+    //  w           width
+    //  h           height
+    //  maxShift    max shift to consider
+    // ----------------------------------------------------------------------
+    fun estimateShift(
+        imageRef: ByteArray,
+        img: ByteArray,
+        w: Int,
+        h: Int,
+        maxShift: Int = 50
+    ): Pair<Int, Int> {
+
+        var bestDx = 0
+        var bestDy = 0
+        var bestScore = Float.NEGATIVE_INFINITY
+
+        // Central window to eliminate borders
+        val startX = w / 4
+        val endX = w * 3 / 4
+        val startY = h / 4
+        val endY = h * 3 / 4
+
+        for (dy in -maxShift..maxShift) {
+            for (dx in -maxShift..maxShift) {
+
+                var score = 0f
+
+                for (y in startY until endY) {
+                    val yy = y + dy
+                    if (yy !in 0 until h) continue
+
+                    val baseRef = y * w
+                    val baseImg = yy * w
+
+                    for (x in startX until endX) {
+                        val xx = x + dx
+                        if (xx !in 0 until w) continue
+
+                        val r = imageRef[baseRef + x].toInt() and 0xFF
+                        val v = img[baseImg + xx].toInt() and 0xFF
+
+                        score += r * v
+                    }
+                }
+
+                if (score > bestScore) {
+                    bestScore = score
+                    bestDx = dx
+                    bestDy = dy
+                }
+            }
+        }
+
+        return Pair(bestDx, bestDy)
+    }
+
+    // ----------------------------------------------------------------------
+    // computeShifts
+    // ----------------------------------------------------------------------
+    fun computeShifts(
+        buffers: List<ByteArray>,
+        w: Int,
+        h: Int,
+        maxShift: Int = 50
+    ): List<Pair<Int, Int>> {
+
+        Log.v(TAG,"cS_1")
+        val shifts = MutableList(buffers.size) { Pair(0, 0) }
+
+        //val refImage = buffers[0]
+        val refImage = buffers[5]
+
+        Log.v(TAG,"cS_2")
+
+        for (i in 1 until buffers.size) {
+            val img = buffers[i]
+
+            val (dx, dy) = estimateShift(
+                imageRef = refImage,
+                img = img,
+                w = w,
+                h = h,
+                maxShift = maxShift
+            )
+
+            Log.v(TAG,"cS_3")
+            shifts[i] = Pair(dx, dy)
+
+            Log.v(TAG, dx.toString())
+            Log.v(TAG, dy.toString())
+        }
+
+        return shifts
+    }
+}
+
+// ----------------------------------------------------------------------
+// CLASS Stacker
+// ----------------------------------------------------------------------
+class Stacker(val width: Int, val height: Int) {
+
+    val buffers = mutableListOf<ByteArray>()
+
+    // ----------------------------------------------------------------------
+    // addFrame
+    // ----------------------------------------------------------------------
+    fun addFrame(bmp: Bitmap) {
+
+        buffers += bitmapToByteArray(bmp)
+        bmp.recycle()
+    }
+
+    // ----------------------------------------------------------------------
+    // stack
+    // ----------------------------------------------------------------------
+    fun stack(
+        buffers: List<ByteArray>,
+        shifts: List<Pair<Int, Int>>,
+        w: Int,
+        h: Int
+    ): FloatArray {
+
+        val totalPixels = w * h
+        val result = FloatArray(totalPixels)
+        val temp = IntArray(buffers.size)
+
+        for (i in 0 until totalPixels) {
+
+            val x = i % w
+            val y = i / w
+
+            for (b in buffers.indices) {
+                val (dx, dy) = shifts[b]
+
+                val xx = x + dx
+                val yy = y + dy
+
+                temp[b] =
+                    if (xx !in 0 until w || yy !in 0 until h) {
+                        0
+                    } else {
+                        val idx = yy * w + xx
+                        buffers[b][idx].toInt() and 0xFF
+                    }
+            }
+
+            temp.sort()
+            result[i] = temp[temp.size / 2].toFloat()
+        }
+
+        return result
+    }
+
+    // ----------------------------------------------------------------------
+    // bitmapToByteArray
+    // ----------------------------------------------------------------------
+    fun bitmapToByteArray(bmp: Bitmap): ByteArray {
+        val w = bmp.width
+        val h = bmp.height
+        val total = w * h
+
+        val result = ByteArray(total)
+        val rowPixels = IntArray(w)
+
+        var index = 0
+
+        for (y in 0 until h) {
+            bmp.getPixels(rowPixels, 0, w, 0, y, w, 1)
+
+            for (x in 0 until w) {
+                val p = rowPixels[x]
+                val r = (p shr 16) and 0xFF
+                val g = (p shr 8) and 0xFF
+                val b = p and 0xFF
+                val gray = ((r + g + b) / 3)
+                result[index++] = gray.toByte()
+            }
+        }
+
+        return result
     }
 }
 
@@ -468,76 +638,4 @@ fun Bitmap.rotate(degrees: Float): Bitmap {
     val matrix = Matrix().apply { postRotate(degrees) }
     val bmp = Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
     return bmp
-}
-
-// ----------------------------------------------------------------------
-// CLASS Stacker
-// ----------------------------------------------------------------------
-class Stacker(val width: Int, val height: Int) {
-
-    private val buffers = mutableListOf<ByteBuffer>()
-    private val totalPixels = width * height
-
-    // ----------------------------------------------------------------------
-    // addFrame
-    // ----------------------------------------------------------------------
-    fun addFrame(bmp: Bitmap) {
-        val buf = bitmapToGrayByteBuffer(bmp)
-        buffers.add(buf)
-
-        // Call GC every three images
-        if (buffers.size % 3 == 0) {
-            System.gc()
-        }
-    }
-
-    // ----------------------------------------------------------------------
-    // buildFinal
-    // ----------------------------------------------------------------------
-    fun buildFinal(): FloatArray {
-        val result = FloatArray(totalPixels)
-        val temp = IntArray(buffers.size)
-
-        for (i in 0 until totalPixels) {
-
-            // Get values from the same pixel from all buffers
-            for (b in buffers.indices) {
-                temp[b] = buffers[b].get(i).toInt() and 0xFF
-            }
-
-            // sort
-            temp.sort()
-
-            // median
-            result[i] = temp[temp.size / 2].toFloat()
-        }
-
-        return result
-    }
-
-    fun bitmapToGrayByteBuffer(bmp: Bitmap): ByteBuffer {
-        val w = bmp.width
-        val h = bmp.height
-
-        val buffer = ByteBuffer.allocateDirect(w * h)
-        buffer.order(ByteOrder.nativeOrder())
-
-        val pixels = IntArray(w * h)
-        bmp.getPixels(pixels, 0, w, 0, 0, w, h)
-
-        for (i in pixels.indices) {
-            val p = pixels[i]
-            val gray = (
-                    android.graphics.Color.red(p) +
-                    android.graphics.Color.green(p) +
-                    android.graphics.Color.blue(p)
-            ) / 3
-            buffer.put(gray.toByte())
-        }
-
-        // 🔥 LIBERA SUBITO LA MEMORIA DEL BITMAP
-        bmp.recycle()
-        buffer.rewind()
-        return buffer
-    }
 }

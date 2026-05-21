@@ -21,6 +21,8 @@
 //      fun SettingSwitch(label: String, value: Boolean, onValueChange: (Boolean) -> Unit,
 //                        modifier: Modifier = Modifier, description: String? = null
 //      fun TopBar(title: String, callback: (Unit) -> Unit)
+//      fun TopBarEx(title: String, callback: (Unit) -> Unit)
+//      fun TopBarEx(title: String, actions: List<TopBarAction>,callback: (Unit) -> Unit)
 // --------------------------------------------------------------------
 package com.pascagames.photostudio
 
@@ -39,15 +41,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -151,6 +149,27 @@ fun NumericUpDown(
 }
 
 // --------------------------------------------------------------------
+// PersistentMessage
+// --------------------------------------------------------------------
+@Composable
+fun PersistentMessage(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 16.sp
+        )
+    }
+}
+
+// --------------------------------------------------------------------
 // SettingSwitch
 // --------------------------------------------------------------------
 @Composable
@@ -220,10 +239,8 @@ fun TopBar(title: String, callback: (Unit) -> Unit) {
     )
 }
 
-
-
 // --------------------------------------------------------------------
-// TopBar
+// TopBarEx
 // --------------------------------------------------------------------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -231,8 +248,6 @@ fun TopBarEx(
                 title: String,
                 actions: List<TopBarAction>,
                 callback: (Unit) -> Unit) {
-
-    var menuExpanded by remember { mutableStateOf(true) }
 
     CenterAlignedTopAppBar(
         title = {
@@ -263,58 +278,25 @@ fun TopBarEx(
                 }
             }
         }
-      /*  actions = {
-            // Azione 1: Galleria
-            IconButton(onClick = {}) {
-                Icon(Icons.Default.PhotoLibrary, contentDescription = "Galleria")
-            }
-
-            // Azione 2: Impostazioni
-            IconButton(onClick = {}) {
-                Icon(Icons.Default.Settings, contentDescription = "Impostazioni")
-            }
-
-            // Overflow menu (3 puntini)
-            IconButton(onClick = { menuExpanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Altro")
-            }
-
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Aiuto") },
-                    onClick = {
-                        menuExpanded = false
-                        //onHelp()
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Info app") },
-                    onClick = {
-                        menuExpanded = false
-                        /* apri schermata info */
-                    }
-                )
-            }
-        }*/
     )
 }
 
+// --------------------------------------------------------------------
+// class TopBarAction
+// --------------------------------------------------------------------
 sealed class TopBarAction(
     val icon: ImageVector,
     val label: String,
     val onClick: () -> Unit
 ) {
     class Gallery(onClick: () -> Unit) :
-        TopBarAction(Icons.Default.PhotoLibrary, "Galleria", onClick)
+        TopBarAction(Icons.Default.PhotoLibrary, "Gallery", onClick)
 
     class Settings(onClick: () -> Unit) :
-        TopBarAction(Icons.Default.Settings, "Impostazioni", onClick)
+        TopBarAction(Icons.Default.Settings, "Settings", onClick)
 
     class Help(onClick: () -> Unit) :
-        TopBarAction(Icons.Default.Help, "Aiuto", onClick)
+        TopBarAction(Icons.Default.Help, "Help", onClick)
 }
 
 

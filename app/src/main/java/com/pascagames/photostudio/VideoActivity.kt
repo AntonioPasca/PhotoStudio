@@ -36,8 +36,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import android.content.Intent
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.widget.Toast
 import androidx.camera.video.Recording
 import androidx.camera.view.LifecycleCameraController
@@ -225,25 +223,22 @@ class VideoActivity : ComponentActivity() {
             while (delay > 0) {
                 delay(1000)
                 delay--
-                if (Settings.photoDelayBeepEnabled) {
-                    val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 20)
+                if (Settings.videoDelayBeepEnabled) {
+                    beep(100,20)
                 }
             }
 
             onRecInProgress()
 
-            if (permissionsGranted) {
-                activeRecording = cameraLib.startRecording(
-                    controller, context,
-                    audioConfig,
-                    onRecStarted = { onRecStarted() },
-                    onRecFinished = {
-                        Toast.makeText(context, "Saved Video", Toast.LENGTH_SHORT).show()
-                        onRecEnded()
-                    }
-                )
-            }
+            activeRecording = cameraLib.startRecording(
+                controller, context,
+                audioConfig,
+                onRecStarted = { onRecStarted() },
+                onRecFinished = {
+                    Toast.makeText(context, "Saved Video", Toast.LENGTH_SHORT).show()
+                    onRecEnded()
+                }
+            )
         }
 
         // UI del countdown

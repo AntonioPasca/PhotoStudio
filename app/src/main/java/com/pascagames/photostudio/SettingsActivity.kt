@@ -138,7 +138,7 @@ class SettingsActivity : ComponentActivity() {
         // Switch - Beep during the delay
         SettingSwitch(
             label = "Photo beep during delay",
-            description = "(Beep enabled before taking a photo)",
+            description = "(Beep enabled during photo delay)",
             value = photoDelayBeepEnabled,
             onValueChange = {
                 photoDelayBeepEnabled = !photoDelayBeepEnabled
@@ -149,7 +149,7 @@ class SettingsActivity : ComponentActivity() {
         // Switch - Beep when stacking is finished
         SettingSwitch(
             label = "Stacking beep",
-            description = "(Beep enabled when staking ended)",
+            description = "(Beep enabled when stacking ended)",
             value = photoStackingBeepEnabled,
             onValueChange = {
                 photoStackingBeepEnabled = !photoStackingBeepEnabled
@@ -214,6 +214,7 @@ class SettingsActivity : ComponentActivity() {
 
         var videoStartBeepEnabled by remember { mutableStateOf(Settings.videoStartBeepEnabled) }
         var videoStopBeepEnabled by remember { mutableStateOf(Settings.videoStopBeepEnabled) }
+        var videoDelayBeepEnabled by remember { mutableStateOf(Settings.videoDelayBeepEnabled) }
         var videoPath by remember { mutableStateOf(Settings.videoPath) }
 
         // Video Settings
@@ -239,6 +240,17 @@ class SettingsActivity : ComponentActivity() {
             onValueChange = {
                 videoStopBeepEnabled = !videoStopBeepEnabled
                 Settings.videoStopBeepEnabled = videoStopBeepEnabled
+            }
+        )
+
+        // Switch - Beep during the delay
+        SettingSwitch(
+            label = "Video beep during delay",
+            description = "(Beep enabled during video delay)",
+            value = videoDelayBeepEnabled,
+            onValueChange = {
+                videoDelayBeepEnabled = !videoDelayBeepEnabled
+                Settings.videoDelayBeepEnabled = videoDelayBeepEnabled
             }
         )
 
@@ -279,6 +291,7 @@ object Settings {
 
     var videoStartBeepEnabled = true
     var videoStopBeepEnabled = true
+    var videoDelayBeepEnabled = false
     var videoBeepDelay = 5
     var videoPath = Environment.DIRECTORY_MOVIES!!
 }
