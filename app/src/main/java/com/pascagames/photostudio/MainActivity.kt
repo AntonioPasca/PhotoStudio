@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.5.0
+// Version:     Rel. 0.6.0
 //
 // Date:        May 2026
 //
@@ -38,7 +38,7 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
 
 private const val APP_NAME = "AstroPhoto"
-private const val VERSION =  "Ver 0.5.6"
+private const val VERSION =  "Ver 0.6.0"
 const val TAG = "PHOTO"
 
 // --------------------------------------------------------------------------

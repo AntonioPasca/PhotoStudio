@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.5.0
+// Version:     Rel. 0.6.0
 //
 // Date:        May 2026
 //
@@ -33,8 +33,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,6 +55,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -124,11 +127,15 @@ fun NumericUpDown(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp))
     ) {
         Text(
-           text = description
+           text = description,
+           Modifier.padding(horizontal = 16.dp)
         )
+
+        Spacer(modifier = Modifier.weight(1f))
+
         IconButton(
             onClick = { if (value > min) onValueChange(value - 1) }
         ) {
@@ -185,6 +192,7 @@ fun SettingSwitch(
         colors = ListItemDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surface),
         tonalElevation = 2.dp,
+        //tonalElevation = 0.dp,
         headlineContent = { Text(label) },
         supportingContent = {
             if (description != null) {

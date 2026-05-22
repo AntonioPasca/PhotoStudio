@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.5.0
+// Version:     Rel. 0.6.0
 //
 // Date:        May 2026
 //
@@ -17,15 +17,19 @@ package com.pascagames.photostudio
 
 import android.os.Bundle
 import android.os.Environment
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,7 +51,6 @@ const val SETTINGS_VIDEO_INDEX = 1
 // --------------------------------------------------------------------------
 class SettingsActivity : ComponentActivity() {
 
-    private var gSetIndex: Int = 0
     private var backToCaller: (Unit) -> Unit = { back() }
 
     // ----------------------------------------------------------------------
@@ -58,17 +61,23 @@ class SettingsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-
         // Get vars from Main
         val bundle = intent.getBundleExtra("activity_data")
-        gSetIndex = bundle!!.getInt("SETTINGS_INDEX")
+        val settingIdx = bundle!!.getInt("SETTINGS_INDEX")
+        var barTitle = ""
+        when (settingIdx) {
+            SETTINGS_PHOTO_INDEX -> barTitle = "Settings (Photo)"
+            SETTINGS_VIDEO_INDEX -> barTitle = "Settings (Video)"
+        }
 
         setContent {
             PhotoStudioTheme {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    topBar = { TopBar("Settings", backToCaller) }) { innerPadding ->
-                    MainScreen()
+                    topBar = { TopBar(barTitle, backToCaller) }) { innerPadding ->
+                        MainScreen(
+                            modifier = Modifier.padding(innerPadding),
+                            settingIdx)
                 }
             }
         }
@@ -85,23 +94,16 @@ class SettingsActivity : ComponentActivity() {
     // MainScreen
     // ----------------------------------------------------------------------
     @Composable
-    fun MainScreen() {
+    fun MainScreen(modifier: Modifier = Modifier, idx: Int) {
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 0.dp, 150.dp)
         ) {
-
-            Log.v(TAG, "SA")
-            Log.v(TAG, gSetIndex.toString())
-
-            if (gSetIndex == SETTINGS_PHOTO_INDEX) {
-                PhotoSettings()
-            }
-
-            if (gSetIndex == SETTINGS_VIDEO_INDEX) {
-                VideoSettings()
+            when (idx) {
+                SETTINGS_PHOTO_INDEX ->   PhotoSettings()
+                SETTINGS_VIDEO_INDEX ->   VideoSettings()
             }
         }
     }
@@ -119,10 +121,6 @@ class SettingsActivity : ComponentActivity() {
 
         // Photo Settings
         // ------------------------------------------------------
-        Text(
-            "Photo",
-            style = TextStyle(fontSize = 32.sp)
-        )
 
         // Switch - Beep after a photo has been taken
         SettingSwitch(
@@ -165,7 +163,6 @@ class SettingsActivity : ComponentActivity() {
                 delayPhoto = it
                 Settings.photoBeepDelay = delayPhoto
             },
-            modifier = Modifier.padding(start = 16.dp),
             min = 0,
             max = 10,
             description =  "Delay (in sec)"
@@ -179,7 +176,6 @@ class SettingsActivity : ComponentActivity() {
                 numMultiplePhotos = it
                 Settings.photoNumMultiple = numMultiplePhotos
             },
-            modifier = Modifier.padding(start = 16.dp),
             min = 1,
             max = 100,
             description =  "Num of multiple photos"
@@ -193,17 +189,20 @@ class SettingsActivity : ComponentActivity() {
                 delayBetweenPhotos = it.toLong()
                 Settings.delayBetweenPhotos = delayBetweenPhotos
             },
-            modifier = Modifier.padding(start = 16.dp),
             min = 100,
             max = 5000,
             description =  "Num of multiple photos"
         )
 
         // Location to save photos
-        Text(
-            "Photo path = $photoPath",
-            Modifier.padding(start = 16.dp, top=20.dp),
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp))
+                .padding(16.dp)
+        ) {
+            Text("Photo path = $photoPath",)
+        }
     }
 
     // ----------------------------------------------------------------------
@@ -219,11 +218,6 @@ class SettingsActivity : ComponentActivity() {
 
         // Video Settings
         // ---------------------------------------------
-        Text(
-            "Video",
-            Modifier.padding(top=30.dp),
-            style = TextStyle(fontSize = 32.sp)
-        )
         SettingSwitch(
             label = "Start video beep",
             description = "(Beep enabled when starting a video)",
@@ -262,17 +256,20 @@ class SettingsActivity : ComponentActivity() {
                 delayVideo = it
                 Settings.videoBeepDelay = delayVideo
             },
-            modifier = Modifier.padding(start = 16.dp),
             min = 0,
             max = 10,
             description =  "Delay (in sec)",
         )
 
-        // Location to save videos
-        Text(
-            "Video path = $videoPath",
-            Modifier.padding(start = 16.dp, top=20.dp)
-        )
+        // Location to save photos
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp))
+                .padding(16.dp)
+        ) {
+            Text("Video path = $videoPath",)
+        }
     }
 }
 

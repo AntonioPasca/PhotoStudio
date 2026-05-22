@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.5.0
+// Version:     Rel. 0.6.0
 //
 // Date:        May 2026
 //
@@ -56,7 +56,8 @@ import kotlinx.coroutines.delay
 class PhotoActivity : ComponentActivity() {
 
     private var backToCaller: (Unit) -> Unit = { back() }
-    var cameraLib = CameraLib()
+    val cameraLib = CameraLib()
+    val stacker = Stacker()
 
     // ----------------------------------------------------------------------
     // onCreate
@@ -134,7 +135,7 @@ class PhotoActivity : ComponentActivity() {
             if (Settings.photoStackingBeepEnabled) {
                 beep(100,20)
             }
-            cameraLib.executeStacking(context, Settings.photoPath)
+            stacker.executeStacking(context, Settings.photoPath)
             if (Settings.photoStackingBeepEnabled) {
                 beep(100,20)
             }
