@@ -21,25 +21,29 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.PhotoStudio">
-
+        <activity
+            android:name=".StackerActivity"
+            android:exported="false"
+            android:label="@string/title_activity_stacker"
+            android:theme="@style/Theme.PhotoStudio" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.PhotoStudio">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <activity
             android:name=".PhotoActivity"
             android:exported="false"
-            android:label="@string/title_activity_settings" />
+            android:label="@string/title_activity_photo" />
         <activity
             android:name=".VideoActivity"
             android:exported="false"
-            android:label="@string/title_activity_settings" />
+            android:label="@string/title_activity_video" />
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
@@ -47,9 +51,7 @@
         <activity
             android:name=".InfoActivity"
             android:exported="false"
-            android:label="@string/title_activity_settings" />
-
-
+            android:label="@string/title_activity_info" />
     </application>
 
 </manifest>

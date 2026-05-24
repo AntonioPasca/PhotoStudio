@@ -1,6 +1,10 @@
 <resources>
     <string name="app_name">PhotoStudio</string>
+    <string name="title_activity_photo">PhotoActivity</string>
+    <string name="title_activity_video">VideoActivity</string>
+    <string name="title_activity_stacker">StackerActivity</string>
     <string name="title_activity_settings">SettingsActivity</string>
+    <string name="title_activity_info">InfoActivity</string>
 
     <!-- Preference Titles -->
     <string name="messages_header">Messages</string>
@@ -16,4 +20,5 @@
     <string name="attachment_summary_on">Automatically download attachments for incoming emails
     </string>
     <string name="attachment_summary_off">Only download attachments when manually requested</string>
+
 </resources>

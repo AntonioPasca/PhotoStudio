@@ -48,6 +48,8 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.compose.runtime.livedata)
     implementation(libs.androidx.exifinterface)
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.constraintlayout)
     val camerax = "1.6.1"
 
     implementation(libs.androidx.core.ktx)

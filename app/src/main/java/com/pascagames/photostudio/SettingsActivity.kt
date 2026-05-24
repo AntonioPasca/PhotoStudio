@@ -17,9 +17,11 @@ package com.pascagames.photostudio
 
 import android.os.Bundle
 import android.os.Environment
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.camera.core.CameraSelector
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,13 +40,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
 const val SETTINGS_PHOTO_INDEX = 0
 const val SETTINGS_VIDEO_INDEX = 1
+const val SETTINGS_STACKER_INDEX = 2
 
 // --------------------------------------------------------------------------
 // CLASS SettingsActivity
@@ -52,6 +54,7 @@ const val SETTINGS_VIDEO_INDEX = 1
 class SettingsActivity : ComponentActivity() {
 
     private var backToCaller: (Unit) -> Unit = { back() }
+    val cameraLib = CameraLib()
 
     // ----------------------------------------------------------------------
     // onCreate
@@ -68,6 +71,7 @@ class SettingsActivity : ComponentActivity() {
         when (settingIdx) {
             SETTINGS_PHOTO_INDEX -> barTitle = "Settings (Photo)"
             SETTINGS_VIDEO_INDEX -> barTitle = "Settings (Video)"
+            SETTINGS_STACKER_INDEX -> barTitle = "Settings (Stacker)"
         }
 
         setContent {
@@ -96,14 +100,19 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     fun MainScreen(modifier: Modifier = Modifier, idx: Int) {
 
+        var rawCanBeEnabled = false
+        if (cameraLib.isRawSupported(LocalContext.current, "0"))
+            rawCanBeEnabled = Settings.photoRawEnabled
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 0.dp, 150.dp)
         ) {
             when (idx) {
-                SETTINGS_PHOTO_INDEX ->   PhotoSettings()
+                SETTINGS_PHOTO_INDEX ->   PhotoSettings(rawCanBeEnabled)
                 SETTINGS_VIDEO_INDEX ->   VideoSettings()
+                SETTINGS_STACKER_INDEX ->   StackerSettings()
             }
         }
     }
@@ -112,17 +121,25 @@ class SettingsActivity : ComponentActivity() {
     // PhotoSettings
     // ----------------------------------------------------------------------
     @Composable
-    fun PhotoSettings() {
+    fun PhotoSettings(rawCanBeEnabled: Boolean) {
 
-        var photoBeepEnabled by remember { mutableStateOf(Settings.photoBeepEnabled) }
-        var photoDelayBeepEnabled by remember { mutableStateOf(Settings.photoDelayBeepEnabled) }
-        var photoStackingBeepEnabled by remember { mutableStateOf(Settings.photoStackingBeepEnabled) }
-        var photoPath by remember { mutableStateOf(Settings.photoPath) }
+        // Handle Settings errors
+        var settingError by remember { mutableStateOf(false) }
+
+        if (settingError) {
+            Toast.makeText(
+                LocalContext.current,
+                "RAW format not handled by this device",
+                Toast.LENGTH_SHORT
+            ).show()
+            settingError = false
+        }
 
         // Photo Settings
         // ------------------------------------------------------
 
         // Switch - Beep after a photo has been taken
+        var photoBeepEnabled by remember { mutableStateOf(Settings.photoBeepEnabled) }
         SettingSwitch(
             label = "Photo beep",
             description = "(Beep enabled when taking a photo)",
@@ -134,6 +151,7 @@ class SettingsActivity : ComponentActivity() {
         )
 
         // Switch - Beep during the delay
+        var photoDelayBeepEnabled by remember { mutableStateOf(Settings.photoDelayBeepEnabled) }
         SettingSwitch(
             label = "Photo beep during delay",
             description = "(Beep enabled during photo delay)",
@@ -144,24 +162,30 @@ class SettingsActivity : ComponentActivity() {
             }
         )
 
-        // Switch - Beep when stacking is finished
+        // Switch - RAW Enable (if available in the device)
+        var photoRawEnabled by remember { mutableStateOf(rawCanBeEnabled) }
         SettingSwitch(
-            label = "Stacking beep",
-            description = "(Beep enabled when stacking ended)",
-            value = photoStackingBeepEnabled,
+            label = "Enable DNG format (RAW)",
+            description = "(DNG Format enabled)",
+            value = photoRawEnabled,
             onValueChange = {
-                photoStackingBeepEnabled = !photoStackingBeepEnabled
-                Settings.photoStackingBeepEnabled = photoStackingBeepEnabled
+                if (rawCanBeEnabled) {
+                    photoRawEnabled = !photoRawEnabled
+                    Settings.photoRawEnabled = photoRawEnabled
+                }
+                else {
+                    settingError = true
+                }
             }
         )
 
         // Numeric Up-Down - Delay in seconds
-        var delayPhoto by remember { mutableIntStateOf(Settings.photoBeepDelay) }
+        var photoBeepDelay by remember { mutableIntStateOf(Settings.photoBeepDelay) }
         NumericUpDown(
-            value = delayPhoto,
+            value = photoBeepDelay,
             onValueChange = {
-                delayPhoto = it
-                Settings.photoBeepDelay = delayPhoto
+                photoBeepDelay = it
+                Settings.photoBeepDelay = photoBeepDelay
             },
             min = 0,
             max = 10,
@@ -169,12 +193,12 @@ class SettingsActivity : ComponentActivity() {
         )
 
         // Numeric Up-Down - Num of multiple photos
-        var numMultiplePhotos by remember { mutableIntStateOf(Settings.photoNumMultiple) }
+        var photNumMultiple by remember { mutableIntStateOf(Settings.photoNumMultiple) }
         NumericUpDown(
-            value = numMultiplePhotos,
+            value = photNumMultiple,
             onValueChange = {
-                numMultiplePhotos = it
-                Settings.photoNumMultiple = numMultiplePhotos
+                photNumMultiple = it
+                Settings.photoNumMultiple = photNumMultiple
             },
             min = 1,
             max = 100,
@@ -195,13 +219,14 @@ class SettingsActivity : ComponentActivity() {
         )
 
         // Location to save photos
+        var photoPath by remember { mutableStateOf(Settings.photoPath) }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp))
                 .padding(16.dp)
         ) {
-            Text("Photo path = $photoPath",)
+            Text("Photo path = $photoPath")
         }
     }
 
@@ -211,13 +236,11 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     fun VideoSettings() {
 
-        var videoStartBeepEnabled by remember { mutableStateOf(Settings.videoStartBeepEnabled) }
-        var videoStopBeepEnabled by remember { mutableStateOf(Settings.videoStopBeepEnabled) }
-        var videoDelayBeepEnabled by remember { mutableStateOf(Settings.videoDelayBeepEnabled) }
-        var videoPath by remember { mutableStateOf(Settings.videoPath) }
-
         // Video Settings
         // ---------------------------------------------
+
+        // Switch - Beep when a video starts
+        var videoStartBeepEnabled by remember { mutableStateOf(Settings.videoStartBeepEnabled) }
         SettingSwitch(
             label = "Start video beep",
             description = "(Beep enabled when starting a video)",
@@ -227,6 +250,9 @@ class SettingsActivity : ComponentActivity() {
                 Settings.videoStartBeepEnabled = videoStartBeepEnabled
             }
         )
+
+        // Switch - Beep when a video stops
+        var videoStopBeepEnabled by remember { mutableStateOf(Settings.videoStopBeepEnabled) }
         SettingSwitch(
             label = "Stop video beep",
             description = "(Beep enabled when stopping a video)",
@@ -238,6 +264,7 @@ class SettingsActivity : ComponentActivity() {
         )
 
         // Switch - Beep during the delay
+        var videoDelayBeepEnabled by remember { mutableStateOf(Settings.videoDelayBeepEnabled) }
         SettingSwitch(
             label = "Video beep during delay",
             description = "(Beep enabled during video delay)",
@@ -262,14 +289,63 @@ class SettingsActivity : ComponentActivity() {
         )
 
         // Location to save photos
+        var videoPath by remember { mutableStateOf(Settings.videoPath) }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp))
                 .padding(16.dp)
         ) {
-            Text("Video path = $videoPath",)
+            Text("Video path = $videoPath")
         }
+    }
+
+    // ----------------------------------------------------------------------
+    // StackerSettings
+    // ----------------------------------------------------------------------
+    @Composable
+    fun StackerSettings() {
+
+        // Stacker Settings
+        // ---------------------------------------------
+
+        // Switch - Beep when stacking starts or ends
+        var stackerBeepEnabled by remember { mutableStateOf(Settings.stackerBeepEnabled) }
+        SettingSwitch(
+            label = "Stacking beep",
+            description = "(Beep enabled when stacking ended)",
+            value = stackerBeepEnabled,
+            onValueChange = {
+                stackerBeepEnabled = !stackerBeepEnabled
+                Settings.stackerBeepEnabled = stackerBeepEnabled
+            }
+        )
+
+        // NumericUpDown - Max allowed shift when re-aligning photos
+        var stackerMaxShift by remember { mutableIntStateOf(Settings.stackerMaxShift) }
+        NumericUpDown(
+            value = stackerMaxShift,
+            onValueChange = {
+                stackerMaxShift = it
+                Settings.stackerMaxShift = stackerMaxShift
+            },
+            min = 10,
+            max = 100,
+            description =  "Max shift in alignment",
+        )
+
+        // NumericUpDown - Portion of the image to use to compute the shift
+        var stackerAreaPercentage by remember { mutableIntStateOf(Settings.stackerAreaPercentage ) }
+        NumericUpDown(
+            value = stackerAreaPercentage,
+            onValueChange = {
+                stackerAreaPercentage = it
+                Settings.stackerAreaPercentage = stackerAreaPercentage
+            },
+            min = 10,
+            max = 75,
+            description =  "Portion of area in alignment",
+        )
     }
 }
 
@@ -280,7 +356,7 @@ object Settings {
 
     var photoBeepEnabled = true
     var photoDelayBeepEnabled = false
-    var photoStackingBeepEnabled = true
+    var photoRawEnabled = true
     var photoBeepDelay = 5
     var photoNumMultiple = 3
     var delayBetweenPhotos = 500L    // (in ms)
@@ -291,4 +367,8 @@ object Settings {
     var videoDelayBeepEnabled = false
     var videoBeepDelay = 5
     var videoPath = Environment.DIRECTORY_MOVIES!!
+
+    var stackerBeepEnabled = true
+    var stackerMaxShift = 50
+    var stackerAreaPercentage = 25
 }

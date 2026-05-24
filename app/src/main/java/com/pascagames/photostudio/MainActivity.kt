@@ -38,7 +38,7 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
 
 private const val APP_NAME = "AstroPhoto"
-private const val VERSION =  "Ver 0.6.0"
+private const val VERSION =  "Ver 0.6.1"
 const val TAG = "PHOTO"
 
 // --------------------------------------------------------------------------
@@ -77,6 +77,15 @@ class MainActivity : ComponentActivity() {
     fun callVideoActivity() {
 
         val intent = Intent(this@MainActivity, VideoActivity::class.java)
+        startActivity(intent)
+    }
+
+    // ----------------------------------------------------------------------
+    // callStackerActivity
+    // ----------------------------------------------------------------------
+    fun callStackerActivity() {
+
+        val intent = Intent(this@MainActivity, StackerActivity::class.java)
         startActivity(intent)
     }
 
@@ -137,7 +146,7 @@ class MainActivity : ComponentActivity() {
     // BottomBar
     // ----------------------------------------------------------------------
     @Composable
-    fun BottomBar() {
+    fun BottomBar(){
 
         // Photo
         NavigationBar {
@@ -180,6 +189,26 @@ class MainActivity : ComponentActivity() {
                 )
             )
 
+            // Stacker
+            NavigationBarItem(
+                selected = true,
+                onClick = {callStackerActivity()},
+                icon = {
+                    Icon(
+                        painterResource(id = R.drawable.stacking),
+                        contentDescription = null
+                    )
+                },
+                label = { Text("Stacking")},
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.Green,
+                    unselectedIconColor = Color.Gray,
+                    selectedTextColor = Color.White,
+                    unselectedTextColor = Color.Gray,
+                    indicatorColor = Color.Transparent
+                )
+            )
+
             // Info
             NavigationBarItem(
                 selected = true,
@@ -199,14 +228,6 @@ class MainActivity : ComponentActivity() {
                     indicatorColor = Color.Transparent
                 )
             )
-        }
-    }
-
-    @Preview(showBackground = true)
-    @Composable
-    fun GreetingPreview() {
-        PhotoStudioTheme {
-            MainScreen()
         }
     }
 }

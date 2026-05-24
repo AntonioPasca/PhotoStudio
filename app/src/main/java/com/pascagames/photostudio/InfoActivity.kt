@@ -86,7 +86,7 @@ class InfoActivity : ComponentActivity() {
             ViewItem("SDK version", "SDK Version = " + Build.VERSION.SDK_INT.toString(), modifier)
             ViewItem("OS version", Build.VERSION.RELEASE, modifier)
             ViewItem("Security Patch", Build.VERSION.SECURITY_PATCH, modifier)
-            ViewItem("CameraX", "1.3.3", modifier)
+            ViewItem("CameraX", "1.6.1", modifier)
         }
     }
 

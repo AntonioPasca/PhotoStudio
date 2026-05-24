@@ -15,8 +15,11 @@
 // --------------------------------------------------------------------------
 package com.pascagames.photostudio
 
+import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.ImageFormat
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -34,8 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
-import android.widget.Toast
+import androidx.camera.core.ImageCapture
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.foundation.background
 import androidx.compose.runtime.mutableStateOf
@@ -44,9 +46,9 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.delay
 
 
@@ -57,7 +59,12 @@ class PhotoActivity : ComponentActivity() {
 
     private var backToCaller: (Unit) -> Unit = { back() }
     val cameraLib = CameraLib()
-    val stacker = Stacker()
+
+    @SuppressLint("RestrictedApi")
+    val rawImageCapture = ImageCapture.Builder()
+        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+        .setBufferFormat(ImageFormat.RAW_SENSOR)
+        .build()
 
     // ----------------------------------------------------------------------
     // onCreate
@@ -109,11 +116,11 @@ class PhotoActivity : ComponentActivity() {
         val lifecycleOwner = LocalLifecycleOwner.current
         var doSinglePhoto by remember {mutableStateOf(false)}
         var doMultiplePhotos by remember {mutableStateOf(false)}
-        var doStacking by remember {mutableStateOf(false)}
 
         if (doSinglePhoto) {
             TakeSinglePhoto(
                 controller = controller,
+                lifecycleOwner,
                 onFinished = {doSinglePhoto = false})
         }
 
@@ -124,38 +131,15 @@ class PhotoActivity : ComponentActivity() {
                 onFinishedAll = {doMultiplePhotos = false})
         }
 
-        if (doStacking) {
-            // Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
-            Box(modifier = Modifier.fillMaxSize()) {
-            PersistentMessage(
-                "Stacking in progress",
-                modifier = Modifier.align(Alignment.TopCenter)
-                        .padding(top = 250.dp)
-            )
-            if (Settings.photoStackingBeepEnabled) {
-                beep(100,20)
-            }
-            stacker.executeStacking(context, Settings.photoPath)
-            if (Settings.photoStackingBeepEnabled) {
-                beep(100,20)
-            }
-            Toast.makeText(context, "Done", Toast.LENGTH_SHORT).show()
-            doStacking = false
-        }
-        }
-
         LaunchedEffect(Unit) {
             controller.bindToLifecycle(lifecycleOwner)
         }
-
-        cameraLib.getCameraPermission()
 
         Scaffold(
             bottomBar = {
                 BottomBar(
                     {doSinglePhoto = true},
-                    onMultiplePhotos = {doMultiplePhotos = true},
-                    onStacking = {doStacking = true}
+                    onMultiplePhotos = {doMultiplePhotos = true}
                )
             }
         ) { innerPadding ->
@@ -178,39 +162,51 @@ class PhotoActivity : ComponentActivity() {
     @Composable
     fun TakeSinglePhoto(
         controller: LifecycleCameraController,
+        lifecycleOwner: LifecycleOwner,
         onFinished: () -> Unit
     ) {
-        var delay by remember { mutableIntStateOf(Settings.photoBeepDelay) }
         val context = LocalContext.current
 
+        var secondsLeft by remember { mutableIntStateOf(Settings.photoBeepDelay) }
+        var showCountDown by remember { mutableStateOf(true) }
+
         LaunchedEffect(Unit) {
-            while (delay > 0) {
+
+            // 1) Countdown
+            while (secondsLeft > 0) {
                 delay(1000)
-                delay--
+                secondsLeft--
                 if (Settings.photoDelayBeepEnabled) {
                     beep(100,20)
                 }
             }
 
-            cameraLib.takePhoto(context, controller)
+            // 2) Take JPG
+            cameraLib.takePhotoJpg(context, controller)
+            delay(1000)
+
+            // 3) Init Raw and take when ready
+            var rawCapture: ImageCapture? = null
+
+            cameraLib.takePhotoRaw(context)
+            showCountDown = false
+            onFinished()
+
+            /*cameraLib.initCamera(
+                    context = context,
+                    lifecycleOwner = lifecycleOwner,
+                    onRawReady = { ic ->
+                        rawCapture = ic
+                        cameraLib.takePhotoRaw(context)
+                        showCountDown = false
+                        onFinished()
+                    }
+            )*/
             onFinished()
         }
 
-        // UI countdown
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.4f))
-                .zIndex(10f),                                   // important!
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = delay.toString(),
-                fontSize = 100.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
+        if (showCountDown)
+            ShowCountDown(secondsLeft)
     }
 
     // ----------------------------------------------------------------------
@@ -227,7 +223,7 @@ class PhotoActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) {
             while (delay > 0) {
-                delay(Settings.delayBetweenPhotos)
+                delay(1000)
                 delay--
                 if (Settings.photoDelayBeepEnabled) {
                     beep(100,20)
@@ -235,12 +231,21 @@ class PhotoActivity : ComponentActivity() {
             }
 
             for (i in 0 until Settings.photoNumMultiple) {
-                cameraLib.takePhoto(context, controller)
-                delay(200)
+                cameraLib.takePhotoJpg(context, controller)
+                delay(Settings.delayBetweenPhotos)
                 onFinishedSingle()
             }
             onFinishedAll()
         }
+
+        ShowCountDown(delay)
+    }
+
+    // ----------------------------------------------------------------------
+    // ShowCountDown
+    // ----------------------------------------------------------------------
+    @Composable
+    fun ShowCountDown(delay: Int) {
 
         // UI countdown
         Box(
@@ -265,8 +270,7 @@ class PhotoActivity : ComponentActivity() {
     @Composable
     fun BottomBar(
         onPhoto: () -> Unit,
-        onMultiplePhotos: () -> Unit,
-        onStacking: () ->Unit){
+        onMultiplePhotos: () -> Unit){
 
         NavigationBar {
             NavigationBarItem(
@@ -306,33 +310,80 @@ class PhotoActivity : ComponentActivity() {
                     indicatorColor = Color.Transparent
                 )
             )
-
-            NavigationBarItem(
-                selected = true,
-                onClick = onStacking,
-                icon = {
-                    Icon(
-                        painterResource(id = R.drawable.stacking),
-                        contentDescription = null
-                    )
-                },
-                label = { Text("Stacking") },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.Green,
-                    unselectedIconColor = Color.White,
-                    selectedTextColor = Color.White,
-                    unselectedTextColor = Color.Gray,
-                    indicatorColor = Color.Transparent
-                )
-            )
-        }
-    }
-
-    @Preview(showBackground = true)
-    @Composable
-    fun GreetingPreview() {
-        PhotoStudioTheme {
-            MainScreen()
         }
     }
 }
+
+/*@Composable
+fun TakeSinglePhoto(
+    controller: LifecycleCameraController,
+    lifecycleOwner: LifecycleOwner,
+    onFinished: () -> Unit
+) {
+    val context = LocalContext.current
+    var secondsLeft by remember { mutableIntStateOf(Settings.photoBeepDelay) }
+    var showOverlay by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+
+        // 1) Countdown
+        while (secondsLeft > 0) {
+            delay(1000)
+            secondsLeft--
+            if (Settings.photoDelayBeepEnabled) beep(100, 20)
+        }
+
+        // 2) Scatto JPG con callback
+        suspendCancellableCoroutine<Unit> { cont ->
+            cameraLib.takePhotoJpg(
+                context = context,
+                controller = controller,
+                onSaved = {
+                    cont.resume(Unit)
+                },
+                onError = { e ->
+                    Log.e("ASTRO", "Errore JPG", e)
+                    cont.resume(Unit) // evita deadlock
+                }
+            )
+        }
+
+        // 3) Ora è SICURO reinizializzare la camera per il RAW
+        var rawCapture: ImageCapture? = null
+
+        suspendCancellableCoroutine<Unit> { cont ->
+            cameraLib.initCamera(
+                context = context,
+                lifecycleOwner = lifecycleOwner,
+                onRawReady = {
+                    rawCapture = it
+                    cont.resume(Unit)
+                }
+            )
+        }
+
+        // 4) Scatto RAW (ora la camera è pronta)
+        cameraLib.takePhotoRaw(context, rawCapture!!)
+
+        // 5) Fine
+        showOverlay = false
+        onFinished()
+    }
+
+    if (showOverlay) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+                .zIndex(10f),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = secondsLeft.toString(),
+                fontSize = 100.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
+    }
+}*/

@@ -20,9 +20,8 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.Environment
 import android.util.Log
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
 import java.io.File
+import kotlin.math.sqrt
 
 // ----------------------------------------------------------------------
 // CLASS Stacker
@@ -81,7 +80,8 @@ class Stacker {
 
         Log.v(TAG,"EX_2")
         // Compute shifts
-        val shifts = computeShifts(buffers = buffers, w = width, h = height, maxShift = 50, refImgIdx)
+        val shifts = computeShifts(buffers = buffers, w = width, h = height,
+                                    maxShift = Settings.stackerMaxShift, refImgIdx)
         Log.v(TAG, shifts.toString())
 
         // Do the final stack
@@ -197,7 +197,16 @@ class Stacker {
         var bestDy = 0
         var bestScore = Float.NEGATIVE_INFINITY
 
-        // Central window to eliminate borders  ------ USARE SETTINGS
+        // Central window to eliminate borders  ------
+        val areaPercentage = Settings.stackerAreaPercentage.toDouble()
+        val starRatio = sqrt(areaPercentage) /20
+        val endRatio = starRatio *3
+
+        Log.v("PHOTO","RATIO")
+        Log.v("PHOTO", starRatio.toString())
+        Log.v("PHOTO", endRatio.toString())
+        Log.v("PHOTO", maxShift.toString())
+
         val startX = w / 4
         val endX = w * 3 / 4
         val startY = h / 4

@@ -316,12 +316,4 @@ class VideoActivity : ComponentActivity() {
     fun createSilentAudioConfig(): AudioConfig {
         return AudioConfig.create(false)
     }
-
-    @Preview(showBackground = true)
-    @Composable
-    fun GreetingPreview() {
-        PhotoStudioTheme {
-            MainScreen()
-        }
-    }
 }

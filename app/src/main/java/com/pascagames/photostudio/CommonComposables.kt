@@ -303,9 +303,6 @@ sealed class TopBarAction(
     class Settings(onClick: () -> Unit) :
         TopBarAction(Icons.Default.Settings, "Settings", onClick)
 
-    class Help(onClick: () -> Unit) :
-        TopBarAction(Icons.Default.Help, "Help", onClick)
+    //class Help(onClick: () -> Unit) :
+    //    TopBarAction(Icons.Default.Help, "Help", onClick)
 }
-
-
-

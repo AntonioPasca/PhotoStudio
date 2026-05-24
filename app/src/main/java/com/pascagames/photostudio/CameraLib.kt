@@ -31,12 +31,15 @@
 package com.pascagames.photostudio
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageFormat
 import android.graphics.Matrix
+import android.hardware.camera2.CameraCharacteristics
 import androidx.exifinterface.media.ExifInterface
 import android.net.Uri
 import android.provider.MediaStore
@@ -48,6 +51,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ZoomState
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
@@ -65,7 +69,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,11 +82,52 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.set
 import androidx.core.graphics.createBitmap
+import android.hardware.camera2.CameraManager
+import androidx.camera.core.Preview
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 // ----------------------------------------------------------------------
 // CLASS CameraLib
 // ----------------------------------------------------------------------
 class CameraLib {
+
+    @SuppressLint("RestrictedApi")
+    fun initCamera(
+        context: Context,
+        lifecycleOwner: LifecycleOwner,
+        onRawReady: (ImageCapture) -> Unit
+    ) {
+
+        Log.v(TAG, "Init camera")
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+
+        cameraProviderFuture.addListener({
+            val cameraProvider = cameraProviderFuture.get()
+
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            // --- Preview ---
+            val preview = Preview.Builder().build()
+
+            // --- ImageCapture RAW ---
+            val rawImageCapture = ImageCapture.Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                .setBufferFormat(ImageFormat.RAW_SENSOR)
+                .build()
+
+            cameraProvider.unbindAll()
+            cameraProvider.bindToLifecycle(
+                lifecycleOwner,
+                cameraSelector,
+                preview,
+                rawImageCapture
+            )
+
+            onRawReady(rawImageCapture)
+
+        }, ContextCompat.getMainExecutor(context))
+    }
 
     // ----------------------------------------------------------------------
     // bitmapToByteArray
@@ -257,6 +304,33 @@ class CameraLib {
     }
 
     // ----------------------------------------------------------------------
+    // isRawSupported
+    // ----------------------------------------------------------------------
+    // Input
+    //      context: Context
+    //      cameraID: String
+    //                  "0" -> Back main camera
+    //                  "1" -> Front camera
+    //                  "2" -> Tele
+    //                  "3" -> Ultra-Wide
+    //  Note
+    //      These values should be confirmed !!!!!!!!!!!!
+    // ----------------------------------------------------------------------
+    //@Composable
+    fun isRawSupported(context: Context, cameraId: String): Boolean {
+        val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        val characteristics = manager.getCameraCharacteristics(cameraId)
+
+        val capabilities = characteristics.get(
+            CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES
+        )
+
+        return capabilities?.contains(
+            CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW
+        ) == true
+    }
+
+    // ----------------------------------------------------------------------
     // rememberCameraController
     // ----------------------------------------------------------------------
     @Composable
@@ -271,46 +345,108 @@ class CameraLib {
             }
         }
         controller.isPinchToZoomEnabled = true
-
         return controller
     }
 
+    @Composable
+    fun rememberCameraProvider(context: Context): ProcessCameraProvider? {
+        var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+        LaunchedEffect(Unit) {
+            val providerFuture = ProcessCameraProvider.getInstance(context)
+            cameraProvider = providerFuture.get()   // blocca solo questo coroutine thread, sicuro
+        }
+
+        return cameraProvider
+    }
+
     // ----------------------------------------------------------------------
-    // takePhoto
+    // takePhotoJpg
     // ----------------------------------------------------------------------
-    fun takePhoto(
+    fun takePhotoJpg(
         context: Context,
         controller: LifecycleCameraController
     ) {
-        val name = "IMG_${System.currentTimeMillis()}.jpg"
+        val nameBase = "IMG_${System.currentTimeMillis()}"
 
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+        // ---------- 1) JPEG con il controller (come fai già) ----------
+        val jpegValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "$nameBase.jpg")
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
             put(MediaStore.Images.Media.RELATIVE_PATH, Settings.photoPath)
         }
 
-        val outputOptions = ImageCapture.OutputFileOptions
+        val jpegOutput = ImageCapture.OutputFileOptions
             .Builder(
                 context.contentResolver,
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues
+                jpegValues
             )
             .build()
 
         controller.takePicture(
-            outputOptions,
+            jpegOutput,
             ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageSavedCallback {
+
                 override fun onError(exc: ImageCaptureException) {
-                    Log.e(TAG, "Error", exc)
+                    Log.e("CameraX", "Error saving JPEG", exc)
+                    Toast.makeText(context, "Errore salvataggio JPEG", Toast.LENGTH_SHORT).show()
                 }
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    Toast.makeText(context, "Photo saved", Toast.LENGTH_SHORT).show()
-                    if (Settings.photoBeepEnabled)
+                    // JPEG ok
+                    if (Settings.photoBeepEnabled) {
                         beep(100, 80)
+                    }
 
+                    Toast.makeText(context, "JPEG salvato", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
+
+    // ----------------------------------------------------------------------
+    // takePhotoRaw
+    // ----------------------------------------------------------------------
+    @SuppressLint("RestrictedApi")
+    fun takePhotoRaw(context: Context) {
+
+        val nameBase = "RAW_${System.currentTimeMillis()}"
+
+        // --- ImageCapture RAW ---
+        val rawImageCapture = ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .setBufferFormat(ImageFormat.RAW_SENSOR)
+            .build()
+
+        val rawValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "$nameBase.dng")
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/x-adobe-dng")
+            put(MediaStore.Images.Media.RELATIVE_PATH, Settings.photoPath)
+        }
+
+        val rawOutput = ImageCapture.OutputFileOptions
+            .Builder(
+                context.contentResolver,
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                rawValues
+            )
+            .build()
+
+        Log.v(TAG, "Take RAW picture")
+        rawImageCapture.takePicture(
+            rawOutput,
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+
+                override fun onError(exc: ImageCaptureException) {
+                    Log.e("CameraX", "Error saving RAW", exc)
+                    Toast.makeText(context, "Errore salvataggio RAW", Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    Toast.makeText(context, "RAW salvato", Toast.LENGTH_SHORT).show()
                 }
             }
         )
@@ -404,8 +540,64 @@ class CameraLib {
 
         recording?.stop()
     }
+
+    fun laplacianVariance(bitmap: Bitmap): Double {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        // Converti in luminanza (Y)
+        val gray = DoubleArray(width * height)
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val r = (p shr 16) and 0xFF
+            val g = (p shr 8) and 0xFF
+            val b = p and 0xFF
+            gray[i] = 0.299*r + 0.587*g + 0.114*b
+        }
+
+        // Kernel Laplaciano 3x3
+        val kernel = arrayOf(
+            intArrayOf(0,  1, 0),
+            intArrayOf(1, -4, 1),
+            intArrayOf(0,  1, 0)
+        )
+
+        val lap = DoubleArray(width * height)
+
+        for (y in 1 until height-1) {
+            for (x in 1 until width-1) {
+                var sum = 0.0
+                for (ky in -1..1) {
+                    for (kx in -1..1) {
+                        val px = x + kx
+                        val py = y + ky
+                        val weight = kernel[ky+1][kx+1]
+                        sum += gray[py * width + px] * weight
+                    }
+                }
+                lap[y * width + x] = sum
+            }
+        }
+
+        // Calcola la varianza
+        val mean = lap.average()
+        var variance = 0.0
+        for (v in lap) variance += (v - mean) * (v - mean)
+        return variance / lap.size
+    }
 }
 
+/* Come usare la varianza per cancellare foto non buone
+val scores = frames.map { frame ->
+    laplacianVariance(frame)
+}
 
+// Ordina per nitidezza
+val sorted = scores.zip(frames).sortedByDescending { it.first }
 
-
+// Tieni il top 30%
+val keepCount = (sorted.size * 0.30).toInt()
+val bestFrames = sorted.take(keepCount).map { it.second }
+*/
