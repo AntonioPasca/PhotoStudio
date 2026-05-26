@@ -26,7 +26,12 @@ import kotlin.math.sqrt
 // ----------------------------------------------------------------------
 // CLASS Stacker
 // ----------------------------------------------------------------------
-// Uses component CameraLib
+// Public Methods
+//      fun executeStacking(context: Context, folder: String)
+//      fun getImagesShifts(): Triple<List<Pair<Int, Int>>?, Int, Int>
+// ----------------------------------------------------------------------
+// Used component
+//      CameraLib
 // ----------------------------------------------------------------------
 class Stacker {
 
@@ -45,43 +50,8 @@ class Stacker {
         context: Context,
         folder: String
     ) {
-        val picturesDir =
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-        val path = File(picturesDir, "CameraX").absolutePath
-
-        val dir = File(path)
-
-        val files = dir.listFiles { f ->
-            f.isFile && (f.extension.lowercase() in listOf("jpg", "jpeg", "png"))
-        } ?: emptyArray()
-
-        if (files.isEmpty()) return
-
-        // Save the first image to get dimensions
-        val refImgIdx = files.count()/2
-        val firstBmp = cameraLib.fixBitmapRotation(files[refImgIdx].absolutePath)
-        val width = firstBmp.width
-        val height = firstBmp.height
-
-        Log.v(TAG,"EX_1")
-        Log.v(TAG,refImgIdx.toString() )
-
-        // Add all images
-        for ((index, file) in files.withIndex()) {
-
-            val bmpRotated = cameraLib.fixBitmapRotation(file.absolutePath)
-            addFrame(bmpRotated)
-
-            // Free memory every three images
-            if (index % 3 == 0) {
-                System.gc()
-            }
-        }
-
-        Log.v(TAG,"EX_2")
-        // Compute shifts
-        val shifts = computeShifts(buffers = buffers, w = width, h = height,
-                                    maxShift = Settings.stackerMaxShift, refImgIdx)
+        // Get the shift of the images
+        val (shifts, width, height)  = getImagesShifts()
         Log.v(TAG, shifts.toString())
 
         // Do the final stack
@@ -94,54 +64,63 @@ class Stacker {
         val name = "Stacked_${System.currentTimeMillis()}.jpg"
         cameraLib.saveBitmapToGallery(context, finalBitmap, name, Settings.photoPath)
     }
+
+    // ----------------------------------------------------------------------
+    // getImagesShifts
+    // ----------------------------------------------------------------------
+    fun getImagesShifts(): Triple<List<Pair<Int, Int>>?, Int, Int> {
+
+        val files = getPictures()
+        if (files.isEmpty()) return Triple(null, 0, 0)
+
+        // Take the first image to get dimensions
+        val refImgIdx = files.count()/2
+        val firstBmp = cameraLib.fixBitmapRotation(files[refImgIdx].absolutePath)
+        val width = firstBmp.width
+        val height = firstBmp.height
+
+        // Add all images
+        for ((index, file) in files.withIndex()) {
+
+            val bmpRotated = cameraLib.fixBitmapRotation(file.absolutePath)
+            buffers += cameraLib.bitmapToByteArray(bmpRotated)
+            bmpRotated.recycle()
+
+            // Free memory every three images
+            if (index % 3 == 0) {
+                System.gc()
+            }
+        }
+
+        Log.v(TAG, "BUFFER")
+        Log.v(TAG, buffers.size.toString())
+        Log.v(TAG, buffers[0].size.toString())
+
+        // Compute shifts
+        val shifts = computeShifts(buffers = buffers, w = width, h = height,
+                                    maxShift = Settings.stackerMaxShift, refImgIdx)
+
+        return Triple(shifts, width, height)
+    }
+
     // Private Methods
 
     // ----------------------------------------------------------------------
-    // addFrame
+    // getPictures
     // ----------------------------------------------------------------------
-    private fun addFrame(bmp: Bitmap) {
+    private fun getPictures(): Array<File>{
 
-        buffers += cameraLib.bitmapToByteArray(bmp)
-        bmp.recycle()
-    }
+        val picturesDir =
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+        val path = File(picturesDir, "CameraX").absolutePath
 
-    // ----------------------------------------------------------------------
-    // stack
-    // ----------------------------------------------------------------------
-    private fun stack(
-        buffers: List<ByteArray>,
-        shifts: List<Pair<Int, Int>>,
-        w: Int,
-        h: Int
-    ): FloatArray {
+        val dir = File(path)
 
-        val totalPixels = w * h
-        val result = FloatArray(totalPixels)
-        val temp = IntArray(buffers.size)
+        val files = dir.listFiles { f ->
+            f.isFile && (f.extension.lowercase() in listOf("jpg", "jpeg", "png"))
+        } ?: emptyArray()
 
-        for (i in 0 until totalPixels) {
-
-            val x = i % w
-            val y = i / w
-
-            for (b in buffers.indices) {
-                val (dx, dy) = shifts[b]
-
-                val xx = x + dx
-                val yy = y + dy
-
-                temp[b] =
-                    if (xx !in 0 until w || yy !in 0 until h) {
-                        0
-                    } else {
-                        val idx = yy * w + xx
-                        buffers[b][idx].toInt() and 0xFF
-                    }
-            }
-            temp.sort()
-            result[i] = temp[temp.size / 2].toFloat()
-        }
-        return result
+        return files
     }
 
     // ----------------------------------------------------------------------
@@ -160,14 +139,13 @@ class Stacker {
 
         for (i in 0 until buffers.size) {
             val img = buffers[i]
+
             if (refImgIdx != i) {
                 shifts[i] = estimateShift(imageRef = refImage, img = img, w = w, h = h,
                         maxShift = maxShift
             )}
             else
                 shifts[i] = Pair(0,0)
-
-            Log.v(TAG, shifts[i].toString())
         }
         return shifts
     }
@@ -245,6 +223,45 @@ class Stacker {
         val end = System.currentTimeMillis()
         Log.v(TAG, "Execution time = ${end - start} ms")
         return Pair(bestDx, bestDy)
+    }
+
+    // ----------------------------------------------------------------------
+    // stack
+    // ----------------------------------------------------------------------
+    private fun stack(
+        buffers: List<ByteArray>,
+        shifts: List<Pair<Int, Int>>?,
+        w: Int,
+        h: Int
+    ): FloatArray {
+
+        val totalPixels = w * h
+        val result = FloatArray(totalPixels)
+        val temp = IntArray(buffers.size)
+
+        for (i in 0 until totalPixels) {
+
+            val x = i % w
+            val y = i / w
+
+            for (b in buffers.indices) {
+                val (dx, dy) = shifts!![b]
+
+                val xx = x + dx
+                val yy = y + dy
+
+                temp[b] =
+                    if (xx !in 0 until w || yy !in 0 until h) {
+                        0
+                    } else {
+                        val idx = yy * w + xx
+                        buffers[b][idx].toInt() and 0xFF
+                    }
+            }
+            temp.sort()
+            result[i] = temp[temp.size / 2].toFloat()
+        }
+        return result
     }
 }
 

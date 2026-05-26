@@ -15,6 +15,8 @@
 // --------------------------------------------------------------------------
 // Public Methods
 //      fun bitmapToByteArray(bmp: Bitmap): ByteArray
+//      fun cameraInit(context: Context, lifecycleOwner: LifecycleOwner,
+//                      onRawReady: (ImageCapture) -> Unit
 //      fun CameraPreview(controller: LifecycleCameraController, modifier: Modifier)
 //      fun fixBitmapRotation(path: String): Bitmap
 //      fun floatArrayToBitmap(buffer: FloatArray, width: Int, height: Int): Bitmap
@@ -31,27 +33,22 @@
 package com.pascagames.photostudio
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.hardware.camera2.CameraCharacteristics
 import androidx.exifinterface.media.ExifInterface
 import android.net.Uri
 import android.provider.MediaStore
-import android.util.Log
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ZoomState
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
@@ -69,9 +66,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,51 +78,12 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.set
 import androidx.core.graphics.createBitmap
 import android.hardware.camera2.CameraManager
-import androidx.camera.core.Preview
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.compose.LocalLifecycleOwner
+
 
 // ----------------------------------------------------------------------
 // CLASS CameraLib
 // ----------------------------------------------------------------------
 class CameraLib {
-
-    @SuppressLint("RestrictedApi")
-    fun initCamera(
-        context: Context,
-        lifecycleOwner: LifecycleOwner,
-        onRawReady: (ImageCapture) -> Unit
-    ) {
-
-        Log.v(TAG, "Init camera")
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-
-        cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
-
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
-            // --- Preview ---
-            val preview = Preview.Builder().build()
-
-            // --- ImageCapture RAW ---
-            val rawImageCapture = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                .setBufferFormat(ImageFormat.RAW_SENSOR)
-                .build()
-
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(
-                lifecycleOwner,
-                cameraSelector,
-                preview,
-                rawImageCapture
-            )
-
-            onRawReady(rawImageCapture)
-
-        }, ContextCompat.getMainExecutor(context))
-    }
 
     // ----------------------------------------------------------------------
     // bitmapToByteArray
@@ -348,59 +304,43 @@ class CameraLib {
         return controller
     }
 
-    @Composable
-    fun rememberCameraProvider(context: Context): ProcessCameraProvider? {
-        var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-
-        LaunchedEffect(Unit) {
-            val providerFuture = ProcessCameraProvider.getInstance(context)
-            cameraProvider = providerFuture.get()   // blocca solo questo coroutine thread, sicuro
-        }
-
-        return cameraProvider
-    }
-
     // ----------------------------------------------------------------------
     // takePhotoJpg
     // ----------------------------------------------------------------------
     fun takePhotoJpg(
         context: Context,
-        controller: LifecycleCameraController
+        controller: CameraController,
+        onSaved: () -> Unit,
+        onError: () -> Unit
     ) {
-        val nameBase = "IMG_${System.currentTimeMillis()}"
+        val name = "IMG_${System.currentTimeMillis()}.jpg"
 
-        // ---------- 1) JPEG con il controller (come fai già) ----------
-        val jpegValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, "$nameBase.jpg")
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
             put(MediaStore.Images.Media.RELATIVE_PATH, Settings.photoPath)
         }
 
-        val jpegOutput = ImageCapture.OutputFileOptions
+        val outputOptions = ImageCapture.OutputFileOptions
             .Builder(
                 context.contentResolver,
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                jpegValues
+                contentValues
             )
             .build()
 
         controller.takePicture(
-            jpegOutput,
+            outputOptions,
             ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageSavedCallback {
 
                 override fun onError(exc: ImageCaptureException) {
-                    Log.e("CameraX", "Error saving JPEG", exc)
-                    Toast.makeText(context, "Errore salvataggio JPEG", Toast.LENGTH_SHORT).show()
+                    exc.printStackTrace()
+                    onError()
                 }
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    // JPEG ok
-                    if (Settings.photoBeepEnabled) {
-                        beep(100, 80)
-                    }
-
-                    Toast.makeText(context, "JPEG salvato", Toast.LENGTH_SHORT).show()
+                    onSaved()
                 }
             }
         )
@@ -409,44 +349,38 @@ class CameraLib {
     // ----------------------------------------------------------------------
     // takePhotoRaw
     // ----------------------------------------------------------------------
-    @SuppressLint("RestrictedApi")
-    fun takePhotoRaw(context: Context) {
-
+    fun takePhotoRaw(
+        context: Context,
+        controller: CameraController,
+        onSaved: () -> Unit,
+        onError: (ImageCaptureException) -> Unit
+    ) {
         val nameBase = "RAW_${System.currentTimeMillis()}"
 
-        // --- ImageCapture RAW ---
-        val rawImageCapture = ImageCapture.Builder()
-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-            .setBufferFormat(ImageFormat.RAW_SENSOR)
-            .build()
-
-        val rawValues = ContentValues().apply {
+        val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, "$nameBase.dng")
             put(MediaStore.MediaColumns.MIME_TYPE, "image/x-adobe-dng")
             put(MediaStore.Images.Media.RELATIVE_PATH, Settings.photoPath)
         }
 
-        val rawOutput = ImageCapture.OutputFileOptions
+        val output = ImageCapture.OutputFileOptions
             .Builder(
                 context.contentResolver,
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                rawValues
+                values
             )
             .build()
 
-        Log.v(TAG, "Take RAW picture")
-        rawImageCapture.takePicture(
-            rawOutput,
+        controller.takePicture(
+            output,
             ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageSavedCallback {
-
                 override fun onError(exc: ImageCaptureException) {
-                    Log.e("CameraX", "Error saving RAW", exc)
-                    Toast.makeText(context, "Errore salvataggio RAW", Toast.LENGTH_SHORT).show()
+                    onError(exc)
                 }
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    Toast.makeText(context, "RAW salvato", Toast.LENGTH_SHORT).show()
+                    onSaved()
                 }
             }
         )

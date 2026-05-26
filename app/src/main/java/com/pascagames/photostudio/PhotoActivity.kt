@@ -40,12 +40,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.camera.core.ImageCapture
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.LifecycleOwner
@@ -73,18 +76,27 @@ class PhotoActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+       /* var title = "Photo (Jpg Format)"
+        if (Settings.photoRawEnabled)
+            title = "Photo (Raw Format)"*/
+
+        val title = "Photo"
+
         val actions = listOf(
             TopBarAction.Settings { settings() },
         )
         setContent {
             PhotoStudioTheme {
-                Scaffold(topBar = { TopBarEx("Photo", actions, backToCaller) })  {
+                Scaffold(topBar = { TopBarEx(title, actions, backToCaller) })  {
                     innerPadding ->
                         MainScreen(modifier = Modifier.padding(innerPadding))
                 }
             }
         }
     }
+
+
+
 
     // --------------------------------------------------------------------------
     // back
@@ -166,9 +178,17 @@ class PhotoActivity : ComponentActivity() {
         onFinished: () -> Unit
     ) {
         val context = LocalContext.current
-
         var secondsLeft by remember { mutableIntStateOf(Settings.photoBeepDelay) }
         var showCountDown by remember { mutableStateOf(true) }
+        var message by remember { mutableStateOf<String?>(null) }
+
+        // Auto-hide message
+        LaunchedEffect(message) {
+            if (message != null) {
+                delay(1500)
+                message = null
+            }
+        }
 
         LaunchedEffect(Unit) {
 
@@ -182,31 +202,48 @@ class PhotoActivity : ComponentActivity() {
             }
 
             // 2) Take JPG
-            cameraLib.takePhotoJpg(context, controller)
+            if (Settings.photoRawEnabled) {
+                cameraLib.takePhotoRaw(
+                    context,
+                    controller,
+                    onSaved = { message = "JPEG saved" },
+                    onError = { message = "JPEG error" })
+            }
+                else {
+                cameraLib.takePhotoJpg(
+                    context,
+                    controller,
+                    onSaved = { message = "JPEG saved" },
+                    onError = { message = "JPEG error" })
+            }
             delay(1000)
 
-            // 3) Init Raw and take when ready
-            var rawCapture: ImageCapture? = null
-
-            cameraLib.takePhotoRaw(context)
             showCountDown = false
-            onFinished()
-
-            /*cameraLib.initCamera(
-                    context = context,
-                    lifecycleOwner = lifecycleOwner,
-                    onRawReady = { ic ->
-                        rawCapture = ic
-                        cameraLib.takePhotoRaw(context)
-                        showCountDown = false
-                        onFinished()
-                    }
-            )*/
             onFinished()
         }
 
         if (showCountDown)
             ShowCountDown(secondsLeft)
+
+        if (message != null) {
+            ShowMessage(message!!)
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // ShowMessage
+    // ----------------------------------------------------------------------
+    @Composable
+    fun ShowMessage(text: String) {
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 20.dp, vertical = 10.dp)
+        )
     }
 
     // ----------------------------------------------------------------------
@@ -219,7 +256,16 @@ class PhotoActivity : ComponentActivity() {
         onFinishedAll: () -> Unit
     ) {
         var delay by remember { mutableIntStateOf(Settings.photoBeepDelay) }
+        var message by remember { mutableStateOf<String?>(null) }
         val context = LocalContext.current
+
+        // Auto-hide message
+        LaunchedEffect(message) {
+            if (message != null) {
+                delay(1500)
+                message = null
+            }
+        }
 
         LaunchedEffect(Unit) {
             while (delay > 0) {
@@ -231,13 +277,16 @@ class PhotoActivity : ComponentActivity() {
             }
 
             for (i in 0 until Settings.photoNumMultiple) {
-                cameraLib.takePhotoJpg(context, controller)
+                cameraLib.takePhotoJpg(
+                    context,
+                    controller,
+                    onSaved = { message = "JPEG saved" },
+                    onError = { message = "JPEG error" })
                 delay(Settings.delayBetweenPhotos)
                 onFinishedSingle()
             }
             onFinishedAll()
         }
-
         ShowCountDown(delay)
     }
 
@@ -282,7 +331,7 @@ class PhotoActivity : ComponentActivity() {
                         contentDescription = null
                     )
                 },
-                label = { Text("Photo") },
+                label = { Text("Single Photo") },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.Green,
                     unselectedIconColor = Color.White,
@@ -313,77 +362,3 @@ class PhotoActivity : ComponentActivity() {
         }
     }
 }
-
-/*@Composable
-fun TakeSinglePhoto(
-    controller: LifecycleCameraController,
-    lifecycleOwner: LifecycleOwner,
-    onFinished: () -> Unit
-) {
-    val context = LocalContext.current
-    var secondsLeft by remember { mutableIntStateOf(Settings.photoBeepDelay) }
-    var showOverlay by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-
-        // 1) Countdown
-        while (secondsLeft > 0) {
-            delay(1000)
-            secondsLeft--
-            if (Settings.photoDelayBeepEnabled) beep(100, 20)
-        }
-
-        // 2) Scatto JPG con callback
-        suspendCancellableCoroutine<Unit> { cont ->
-            cameraLib.takePhotoJpg(
-                context = context,
-                controller = controller,
-                onSaved = {
-                    cont.resume(Unit)
-                },
-                onError = { e ->
-                    Log.e("ASTRO", "Errore JPG", e)
-                    cont.resume(Unit) // evita deadlock
-                }
-            )
-        }
-
-        // 3) Ora è SICURO reinizializzare la camera per il RAW
-        var rawCapture: ImageCapture? = null
-
-        suspendCancellableCoroutine<Unit> { cont ->
-            cameraLib.initCamera(
-                context = context,
-                lifecycleOwner = lifecycleOwner,
-                onRawReady = {
-                    rawCapture = it
-                    cont.resume(Unit)
-                }
-            )
-        }
-
-        // 4) Scatto RAW (ora la camera è pronta)
-        cameraLib.takePhotoRaw(context, rawCapture!!)
-
-        // 5) Fine
-        showOverlay = false
-        onFinished()
-    }
-
-    if (showOverlay) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.4f))
-                .zIndex(10f),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = secondsLeft.toString(),
-                fontSize = 100.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
-    }
-}*/

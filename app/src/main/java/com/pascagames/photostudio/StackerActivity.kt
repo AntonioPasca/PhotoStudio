@@ -17,6 +17,7 @@ package com.pascagames.photostudio
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -41,8 +42,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
 // --------------------------------------------------------------------------
@@ -96,6 +99,17 @@ class StackerActivity : ComponentActivity() {
     }
 
     // ----------------------------------------------------------------------
+    // analyzeImages
+    // ----------------------------------------------------------------------
+    private fun analyzeImages() {
+
+        val (shifts, w, h) = stacker.getImagesShifts()
+        val n = shifts!!.count()
+        for (i in 0..n-1)
+            Log.v(TAG, shifts[i].toString())
+    }
+
+    // ----------------------------------------------------------------------
     // MainScreen
     // ----------------------------------------------------------------------
     @Composable
@@ -103,10 +117,18 @@ class StackerActivity : ComponentActivity() {
 
         val context = LocalContext.current
         var doStacking by remember { mutableStateOf(false) }
+        var doAnalyze by remember { mutableStateOf(false) }
+
+        if (doAnalyze)  {
+
+            Toast.makeText(context, "Analyzing images", Toast.LENGTH_SHORT).show()
+            analyzeImages()
+            doAnalyze = false
+        }
 
         if (doStacking) {
 
-            // Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
             Box(modifier = Modifier.fillMaxSize()) {
                 PersistentMessage(
                     "Stacking in progress",
@@ -127,9 +149,12 @@ class StackerActivity : ComponentActivity() {
             }
         }
 
+        // UI DI STACKING --------------  RIFARE --------------------
         Scaffold(
             bottomBar = {
-                BottomBar(onStacking = { doStacking = true })
+                BottomBar(
+                    onStacking = { doStacking = true },
+                    onAnalyzing = {doAnalyze = true})
             }
         ) { innerPadding ->
 
@@ -138,10 +163,17 @@ class StackerActivity : ComponentActivity() {
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
+                Text(
+                    text = "Stacking",
+                    fontSize = 60.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Green,
+                    modifier = Modifier.padding(start = 90.dp, top = 120.dp)
+                )
                 Image(
-                    painter = painterResource(id = R.drawable.moon),
+                    painter = painterResource(id = R.drawable.stack),
                     contentDescription = null,
-                    modifier = Modifier.padding(start = 0.dp, top = 350.dp)
+                    modifier = Modifier.padding(start = 10.dp, top = 250.dp)
                 )
             }
         }
@@ -151,10 +183,34 @@ class StackerActivity : ComponentActivity() {
     // BottomBar
     // ----------------------------------------------------------------------
     @Composable
-    fun BottomBar(onStacking: () -> Unit) {
+    fun BottomBar(
+                    onStacking: () -> Unit,
+                    onAnalyzing: () -> Unit) {
 
         NavigationBar {
-            // Stacking
+
+            // Analyze
+            NavigationBarItem(
+                selected = true,
+                //onClick = {analyzeImages()},
+                onClick = onAnalyzing,
+                icon = {
+                    Icon(
+                        painterResource(id = R.drawable.analyze),
+                        contentDescription = null
+                    )
+                },
+                label = { Text("Analyze") },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.Green,
+                    unselectedIconColor = Color.Gray,
+                    selectedTextColor = Color.White,
+                    unselectedTextColor = Color.Gray,
+                    indicatorColor = Color.Transparent
+                )
+            )
+
+            // Stack
             NavigationBarItem(
                 selected = true,
                 onClick = onStacking,
@@ -167,7 +223,7 @@ class StackerActivity : ComponentActivity() {
                 label = { Text("Stacking") },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.Green,
-                    unselectedIconColor = Color.White,
+                    unselectedIconColor = Color.Gray,
                     selectedTextColor = Color.White,
                     unselectedTextColor = Color.Gray,
                     indicatorColor = Color.Transparent

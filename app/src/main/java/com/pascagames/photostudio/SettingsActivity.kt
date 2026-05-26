@@ -102,7 +102,8 @@ class SettingsActivity : ComponentActivity() {
 
         var rawCanBeEnabled = false
         if (cameraLib.isRawSupported(LocalContext.current, "0"))
-            rawCanBeEnabled = Settings.photoRawEnabled
+            //rawCanBeEnabled = Settings.photoRawEnabled
+            rawCanBeEnabled = true
 
         Column(
             modifier = Modifier
@@ -163,7 +164,11 @@ class SettingsActivity : ComponentActivity() {
         )
 
         // Switch - RAW Enable (if available in the device)
-        var photoRawEnabled by remember { mutableStateOf(rawCanBeEnabled) }
+        var initValue = Settings.photoRawEnabled
+        if (!rawCanBeEnabled)
+            initValue = false
+
+        var photoRawEnabled by remember { mutableStateOf(initValue) }
         SettingSwitch(
             label = "Enable DNG format (RAW)",
             description = "(DNG Format enabled)",
@@ -369,6 +374,6 @@ object Settings {
     var videoPath = Environment.DIRECTORY_MOVIES!!
 
     var stackerBeepEnabled = true
-    var stackerMaxShift = 50
+    var stackerMaxShift = 20
     var stackerAreaPercentage = 25
 }
