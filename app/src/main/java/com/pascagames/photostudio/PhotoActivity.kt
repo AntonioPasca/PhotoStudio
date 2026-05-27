@@ -48,6 +48,7 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -95,9 +96,6 @@ class PhotoActivity : ComponentActivity() {
         }
     }
 
-
-
-
     // --------------------------------------------------------------------------
     // back
     // --------------------------------------------------------------------------
@@ -129,10 +127,10 @@ class PhotoActivity : ComponentActivity() {
         var doSinglePhoto by remember {mutableStateOf(false)}
         var doMultiplePhotos by remember {mutableStateOf(false)}
 
+
         if (doSinglePhoto) {
             TakeSinglePhoto(
                 controller = controller,
-                lifecycleOwner,
                 onFinished = {doSinglePhoto = false})
         }
 
@@ -140,7 +138,11 @@ class PhotoActivity : ComponentActivity() {
             TakeMultiplePhotos(
                 controller = controller,
                 onFinishedSingle = {},
-                onFinishedAll = {doMultiplePhotos = false})
+                onEnd = {
+                    doMultiplePhotos = false
+                    if (Settings.photoBeepEnabled)
+                        beep(100, 50)
+                })
         }
 
         LaunchedEffect(Unit) {
@@ -174,7 +176,6 @@ class PhotoActivity : ComponentActivity() {
     @Composable
     fun TakeSinglePhoto(
         controller: LifecycleCameraController,
-        lifecycleOwner: LifecycleOwner,
         onFinished: () -> Unit
     ) {
         val context = LocalContext.current
@@ -185,13 +186,12 @@ class PhotoActivity : ComponentActivity() {
         // Auto-hide message
         LaunchedEffect(message) {
             if (message != null) {
-                delay(1500)
+                delay(5000)
                 message = null
             }
         }
 
         LaunchedEffect(Unit) {
-
             // 1) Countdown
             while (secondsLeft > 0) {
                 delay(1000)
@@ -201,13 +201,13 @@ class PhotoActivity : ComponentActivity() {
                 }
             }
 
-            // 2) Take JPG
+            // 2) Take RAW or JPG photo
             if (Settings.photoRawEnabled) {
                 cameraLib.takePhotoRaw(
                     context,
                     controller,
-                    onSaved = { message = "JPEG saved" },
-                    onError = { message = "JPEG error" })
+                    onSaved = { message = "RAW saved" },
+                    onError = { message = "RAW error" })
             }
                 else {
                 cameraLib.takePhotoJpg(
@@ -216,34 +216,22 @@ class PhotoActivity : ComponentActivity() {
                     onSaved = { message = "JPEG saved" },
                     onError = { message = "JPEG error" })
             }
-            delay(1000)
 
+            delay(1000)
             showCountDown = false
+
+            if (Settings.photoBeepEnabled)
+                beep(100, 50)
+
             onFinished()
         }
 
         if (showCountDown)
-            ShowCountDown(secondsLeft)
+            //ShowCountDown(secondsLeft)
+            ShowMessage(secondsLeft.toString(), 100.sp)
 
-        if (message != null) {
-            ShowMessage(message!!)
-        }
-    }
-
-    // ----------------------------------------------------------------------
-    // ShowMessage
-    // ----------------------------------------------------------------------
-    @Composable
-    fun ShowMessage(text: String) {
-        Text(
-            text = text,
-            color = Color.White,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 20.dp, vertical = 10.dp)
-        )
+        if (message != null)
+            ShowMessage(message!!, 22.sp)
     }
 
     // ----------------------------------------------------------------------
@@ -253,64 +241,66 @@ class PhotoActivity : ComponentActivity() {
     fun TakeMultiplePhotos(
         controller: LifecycleCameraController,
         onFinishedSingle: () -> Unit,
-        onFinishedAll: () -> Unit
+        onEnd: () -> Unit
     ) {
-        var delay by remember { mutableIntStateOf(Settings.photoBeepDelay) }
-        var message by remember { mutableStateOf<String?>(null) }
         val context = LocalContext.current
+        var secondsLeft by remember { mutableIntStateOf(Settings.photoBeepDelay) }
+        var showCountDown by remember { mutableStateOf(true) }
+        var message by remember { mutableStateOf<String?>(null) }
 
         // Auto-hide message
         LaunchedEffect(message) {
             if (message != null) {
-                delay(1500)
+                delay(5000)
                 message = null
             }
         }
 
         LaunchedEffect(Unit) {
-            while (delay > 0) {
+
+            // Countdown
+            while (secondsLeft > 0) {
                 delay(1000)
-                delay--
+                secondsLeft--
                 if (Settings.photoDelayBeepEnabled) {
                     beep(100,20)
                 }
             }
 
-            for (i in 0 until Settings.photoNumMultiple) {
-                cameraLib.takePhotoJpg(
-                    context,
-                    controller,
-                    onSaved = { message = "JPEG saved" },
-                    onError = { message = "JPEG error" })
+            showCountDown = false
+
+            // Multiple photo loop
+            for (showShotIdx in 0 until Settings.photoNumMultiple) {
+
+                if (Settings.photoRawEnabled) {
+                    cameraLib.takePhotoRaw(
+                        context,
+                        controller,
+                        onSaved = { message = "RAW shot " + (showShotIdx +1).toString()},
+                        onError = { message = "RAW error on shot " + (showShotIdx +1).toString()})
+                }
+                else {
+                    cameraLib.takePhotoJpg(
+                        context,
+                        controller,
+                        onSaved = { message = "JPG shot " + (showShotIdx +1).toString() },
+                        onError = { message = "JPG error on shot " + (showShotIdx +1).toString()})
+                        onFinishedSingle()
+                }
+
                 delay(Settings.delayBetweenPhotos)
-                onFinishedSingle()
+
             }
-            onFinishedAll()
+            onEnd()
         }
-        ShowCountDown(delay)
-    }
 
-    // ----------------------------------------------------------------------
-    // ShowCountDown
-    // ----------------------------------------------------------------------
-    @Composable
-    fun ShowCountDown(delay: Int) {
+        // Show count down - OK
+        if (showCountDown)
+            ShowMessage(secondsLeft.toString(), 100.sp)
 
-        // UI countdown
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.4f))
-                .zIndex(10f),                                   // important!
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = delay.toString(),
-                fontSize = 100.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
+        // Show message
+        if (message != null)
+            ShowMessage(message!!, 22.sp)
     }
 
     // ----------------------------------------------------------------------

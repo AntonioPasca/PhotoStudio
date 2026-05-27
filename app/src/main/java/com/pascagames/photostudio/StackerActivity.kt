@@ -130,11 +130,12 @@ class StackerActivity : ComponentActivity() {
 
             Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
             Box(modifier = Modifier.fillMaxSize()) {
-                PersistentMessage(
+                /*PersistentMessage(
                     "Stacking in progress",
                     modifier = Modifier.align(Alignment.TopCenter)
                         .padding(top = 250.dp)
-                )
+                )*/
+                ShowMessage("Stacking in progress", 80.sp)
                 if (Settings.stackerBeepEnabled) {
                     beep(100, 20)
                 }

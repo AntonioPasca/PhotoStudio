@@ -220,7 +220,7 @@ class SettingsActivity : ComponentActivity() {
             },
             min = 100,
             max = 5000,
-            description =  "Num of multiple photos"
+            description =  "Delay between succ. photos"
         )
 
         // Location to save photos
@@ -364,7 +364,7 @@ object Settings {
     var photoRawEnabled = true
     var photoBeepDelay = 5
     var photoNumMultiple = 3
-    var delayBetweenPhotos = 500L    // (in ms)
+    var delayBetweenPhotos = 2000L    // (in ms)
     var photoPath = "Pictures/CameraX"
 
     var videoStartBeepEnabled = true

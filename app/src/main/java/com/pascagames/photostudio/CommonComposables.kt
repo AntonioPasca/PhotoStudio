@@ -20,8 +20,8 @@
 //                      min: Int,  max: Int)
 //      fun SettingSwitch(label: String, value: Boolean, onValueChange: (Boolean) -> Unit,
 //                        modifier: Modifier = Modifier, description: String? = null
+//      fun ShowMessage(text: String, fontSize: TextUnit)
 //      fun TopBar(title: String, callback: (Unit) -> Unit)
-//      fun TopBarEx(title: String, callback: (Unit) -> Unit)
 //      fun TopBarEx(title: String, actions: List<TopBarAction>,callback: (Unit) -> Unit)
 // --------------------------------------------------------------------
 package com.pascagames.photostudio
@@ -34,9 +34,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,7 +44,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
@@ -67,8 +66,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
 
 // --------------------------------------------------------------------
@@ -156,27 +158,6 @@ fun NumericUpDown(
 }
 
 // --------------------------------------------------------------------
-// PersistentMessage
-// --------------------------------------------------------------------
-@Composable
-fun PersistentMessage(
-    text: String,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-    ) {
-        Text(
-            text = text,
-            color = Color.White,
-            fontSize = 16.sp
-        )
-    }
-}
-
-// --------------------------------------------------------------------
 // SettingSwitch
 // --------------------------------------------------------------------
 @Composable
@@ -192,7 +173,6 @@ fun SettingSwitch(
         colors = ListItemDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surface),
         tonalElevation = 2.dp,
-        //tonalElevation = 0.dp,
         headlineContent = { Text(label) },
         supportingContent = {
             if (description != null) {
@@ -212,6 +192,30 @@ fun SettingSwitch(
             )
         }
     )
+}
+
+// ----------------------------------------------------------------------
+// ShowMessage
+// ----------------------------------------------------------------------
+@Composable
+fun ShowMessage(text: String, fontSize: TextUnit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.4f))
+            .zIndex(10f),                                   // important!
+        contentAlignment = Alignment.Center) {
+
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Bold
+            /* modifier = Modifier
+                 .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                 .padding(horizontal = 20.dp, vertical = 10.dp)*/
+        )
+    }
 }
 
 // --------------------------------------------------------------------
