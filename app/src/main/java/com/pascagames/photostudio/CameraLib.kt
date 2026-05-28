@@ -15,8 +15,6 @@
 // --------------------------------------------------------------------------
 // Public Methods
 //      fun bitmapToByteArray(bmp: Bitmap): ByteArray
-//      fun cameraInit(context: Context, lifecycleOwner: LifecycleOwner,
-//                      onRawReady: (ImageCapture) -> Unit
 //      fun CameraPreview(controller: LifecycleCameraController, modifier: Modifier)
 //      fun fixBitmapRotation(path: String): Bitmap
 //      fun floatArrayToBitmap(buffer: FloatArray, width: Int, height: Int): Bitmap
@@ -474,64 +472,4 @@ class CameraLib {
 
         recording?.stop()
     }
-
-    fun laplacianVariance(bitmap: Bitmap): Double {
-        val width = bitmap.width
-        val height = bitmap.height
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-
-        // Converti in luminanza (Y)
-        val gray = DoubleArray(width * height)
-        for (i in pixels.indices) {
-            val p = pixels[i]
-            val r = (p shr 16) and 0xFF
-            val g = (p shr 8) and 0xFF
-            val b = p and 0xFF
-            gray[i] = 0.299*r + 0.587*g + 0.114*b
-        }
-
-        // Kernel Laplaciano 3x3
-        val kernel = arrayOf(
-            intArrayOf(0,  1, 0),
-            intArrayOf(1, -4, 1),
-            intArrayOf(0,  1, 0)
-        )
-
-        val lap = DoubleArray(width * height)
-
-        for (y in 1 until height-1) {
-            for (x in 1 until width-1) {
-                var sum = 0.0
-                for (ky in -1..1) {
-                    for (kx in -1..1) {
-                        val px = x + kx
-                        val py = y + ky
-                        val weight = kernel[ky+1][kx+1]
-                        sum += gray[py * width + px] * weight
-                    }
-                }
-                lap[y * width + x] = sum
-            }
-        }
-
-        // Calcola la varianza
-        val mean = lap.average()
-        var variance = 0.0
-        for (v in lap) variance += (v - mean) * (v - mean)
-        return variance / lap.size
-    }
 }
-
-/* Come usare la varianza per cancellare foto non buone
-val scores = frames.map { frame ->
-    laplacianVariance(frame)
-}
-
-// Ordina per nitidezza
-val sorted = scores.zip(frames).sortedByDescending { it.first }
-
-// Tieni il top 30%
-val keepCount = (sorted.size * 0.30).toInt()
-val bestFrames = sorted.take(keepCount).map { it.second }
-*/

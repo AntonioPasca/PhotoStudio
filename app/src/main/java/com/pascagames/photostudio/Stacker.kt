@@ -17,7 +17,9 @@ package com.pascagames.photostudio
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.net.Uri
 import android.os.Environment
 import android.util.Log
 import java.io.File
@@ -49,10 +51,14 @@ class Stacker {
     fun executeStacking(
         context: Context,
         folder: String
-    ) {
+    ): Boolean {
+
         // Get the shift of the images
         val (shifts, width, height)  = getImagesShifts()
-        Log.v(TAG, shifts.toString())
+        
+        // No stack possible if there are less than two files
+        if (shifts == null)
+            return false
 
         // Do the final stack
         val resultArray = stack(buffers, shifts, width, height)
@@ -63,6 +69,7 @@ class Stacker {
         // Save
         val name = "Stacked_${System.currentTimeMillis()}.jpg"
         cameraLib.saveBitmapToGallery(context, finalBitmap, name, Settings.photoPath)
+        return true
     }
 
     // ----------------------------------------------------------------------
@@ -70,8 +77,10 @@ class Stacker {
     // ----------------------------------------------------------------------
     fun getImagesShifts(): Triple<List<Pair<Int, Int>>?, Int, Int> {
 
+        // Get all the pictures - Return if less than two
         val files = getPictures()
-        if (files.isEmpty()) return Triple(null, 0, 0)
+        if (files.count() < 2)
+            return Triple(null, 0, 0)
 
         // Take the first image to get dimensions
         val refImgIdx = files.count()/2
@@ -108,7 +117,7 @@ class Stacker {
     // ----------------------------------------------------------------------
     // getPictures
     // ----------------------------------------------------------------------
-    private fun getPictures(): Array<File>{
+    fun getPictures(): Array<File>{
 
         val picturesDir =
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
@@ -117,7 +126,7 @@ class Stacker {
         val dir = File(path)
 
         val files = dir.listFiles { f ->
-            f.isFile && (f.extension.lowercase() in listOf("jpg", "jpeg", "png"))
+            f.isFile && (f.extension.lowercase() in listOf("jpg", "jpeg", "png", "dng"))
         } ?: emptyArray()
 
         return files
@@ -262,6 +271,67 @@ class Stacker {
             result[i] = temp[temp.size / 2].toFloat()
         }
         return result
+    }
+
+    // ----------------------------------------------------------------------
+    // laplacianVariance
+    // ----------------------------------------------------------------------
+    fun laplacianVariance(bitmap: Bitmap): Double {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        // Convert to luminance (Y)
+        val gray = DoubleArray(width * height)
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val r = (p shr 16) and 0xFF
+            val g = (p shr 8) and 0xFF
+            val b = p and 0xFF
+            gray[i] = 0.299*r + 0.587*g + 0.114*b
+        }
+
+        // Laplacian Kernel  3x3
+        val kernel = arrayOf(
+            intArrayOf(0,  1, 0),
+            intArrayOf(1, -4, 1),
+            intArrayOf(0,  1, 0)
+        )
+
+        val lap = DoubleArray(width * height)
+
+        for (y in 1 until height-1) {
+            for (x in 1 until width-1) {
+                var sum = 0.0
+                for (ky in -1..1) {
+                    for (kx in -1..1) {
+                        val px = x + kx
+                        val py = y + ky
+                        val weight = kernel[ky+1][kx+1]
+                        sum += gray[py * width + px] * weight
+                    }
+                }
+                lap[y * width + x] = sum
+            }
+        }
+
+        // Compute variance
+        val mean = lap.average()
+        var variance = 0.0
+        for (v in lap) variance += (v - mean) * (v - mean)
+        return variance / lap.size
+    }
+
+    fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 }
 

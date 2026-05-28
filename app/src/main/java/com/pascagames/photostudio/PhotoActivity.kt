@@ -19,7 +19,6 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.ImageFormat
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -39,20 +38,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.camera.core.ImageCapture
 import androidx.camera.view.LifecycleCameraController
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
-import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.delay
 
 
@@ -192,7 +182,7 @@ class PhotoActivity : ComponentActivity() {
         }
 
         LaunchedEffect(Unit) {
-            // 1) Countdown
+            // Countdown
             while (secondsLeft > 0) {
                 delay(1000)
                 secondsLeft--
@@ -201,7 +191,7 @@ class PhotoActivity : ComponentActivity() {
                 }
             }
 
-            // 2) Take RAW or JPG photo
+            // Take RAW or JPG photo
             if (Settings.photoRawEnabled) {
                 cameraLib.takePhotoRaw(
                     context,
@@ -227,7 +217,6 @@ class PhotoActivity : ComponentActivity() {
         }
 
         if (showCountDown)
-            //ShowCountDown(secondsLeft)
             ShowMessage(secondsLeft.toString(), 100.sp)
 
         if (message != null)

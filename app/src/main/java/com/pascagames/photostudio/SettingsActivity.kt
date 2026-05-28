@@ -374,6 +374,6 @@ object Settings {
     var videoPath = Environment.DIRECTORY_MOVIES!!
 
     var stackerBeepEnabled = true
-    var stackerMaxShift = 20
+    var stackerMaxShift = 50
     var stackerAreaPercentage = 25
 }
