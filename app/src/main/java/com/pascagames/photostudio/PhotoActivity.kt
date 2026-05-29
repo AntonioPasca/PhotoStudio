@@ -117,7 +117,6 @@ class PhotoActivity : ComponentActivity() {
         var doSinglePhoto by remember {mutableStateOf(false)}
         var doMultiplePhotos by remember {mutableStateOf(false)}
 
-
         if (doSinglePhoto) {
             TakeSinglePhoto(
                 controller = controller,

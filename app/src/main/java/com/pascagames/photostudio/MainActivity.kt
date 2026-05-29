@@ -31,14 +31,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
 
 private const val APP_NAME = "AstroPhoto"
-private const val VERSION =  "Ver 0.6.4"
+private const val VERSION =  "Ver 0.6.5"
 const val TAG = "PHOTO"
 
 // --------------------------------------------------------------------------

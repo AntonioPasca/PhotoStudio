@@ -189,10 +189,10 @@ class Stacker {
         val starRatio = sqrt(areaPercentage) /20
         val endRatio = starRatio *3
 
-        Log.v("PHOTO","RATIO")
-        Log.v("PHOTO", starRatio.toString())
-        Log.v("PHOTO", endRatio.toString())
-        Log.v("PHOTO", maxShift.toString())
+        Log.v(TAG,"RATIO")
+        Log.v(TAG, starRatio.toString())
+        Log.v(TAG, endRatio.toString())
+        Log.v(TAG, maxShift.toString())
 
         val startX = w / 4
         val endX = w * 3 / 4
@@ -321,17 +321,6 @@ class Stacker {
         var variance = 0.0
         for (v in lap) variance += (v - mean) * (v - mean)
         return variance / lap.size
-    }
-
-    fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
-        return try {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                BitmapFactory.decodeStream(input)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
     }
 }
 

@@ -17,7 +17,7 @@ package com.pascagames.photostudio
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -26,8 +26,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -46,9 +48,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.documentfile.provider.DocumentFile
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
-import androidx.core.net.toUri
 
 
 // --------------------------------------------------------------------------
@@ -136,10 +136,7 @@ class StackerActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     // analyzeImages
     // ----------------------------------------------------------------------
-    // ToDo
-    //  !!!!! SERVE UI PER VISUALIZZARE SHIFTS
-    // ----------------------------------------------------------------------
-    private fun analyzeImages(context: Context) {
+    private fun analyzeImages(context: Context): List<Pair<Int, Int>>? {
 
         val (shifts, w, h) = stacker.getImagesShifts()
         if (shifts == null)
@@ -150,38 +147,28 @@ class StackerActivity : ComponentActivity() {
                 Log.v(TAG, shifts[i].toString())
             Toast.makeText(context, "Done", Toast.LENGTH_SHORT).show()
         }
+        return shifts
     }
 
     // ----------------------------------------------------------------------
     // computeVariance
     // ----------------------------------------------------------------------
-    private fun computeVariance(context: Context) {
+    private fun computeVariance(context: Context): List<Double> {
 
-        val images: List<Uri> = listAllImages(context)
-        Log.v(TAG, images.count().toString())
-
-        for (uri in images) {
-            val bmp = stacker.loadBitmapFromUri(context, uri)
+        val sharps = mutableListOf<Double>()
+        val files = stacker.getPictures()
+        for ((index, file) in files.withIndex()) {
+            val bmp = BitmapFactory.decodeFile(file.absolutePath)
             if (bmp != null) {
                 val sharpness = stacker.laplacianVariance(bmp)
-                Log.e(TAG, "File=${uri.lastPathSegment} sharpness=$sharpness")
+                sharps.add(sharpness)
                 bmp.recycle()
+                Log.v(TAG, sharpness.toString())
             }
         }
+        return sharps
     }
 
-    fun listAllImages(context: Context): List<Uri> {
-        val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
-        //val uriString = prefs.getString("cameraX_tree_uri", null) ?: return emptyList()
-        val uriString = prefs.getString("cameraX", null) ?: return emptyList()
-
-        val treeUri = uriString.toUri()
-        val docTree = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyList()
-
-        return docTree.listFiles()
-            .filter { it.isFile && it.name?.endsWith(".jpg", true) == true }
-            .map { it.uri }
-    }
 
     /* Come usare la varianza per cancellare foto non buone
     val scores = frames.map { frame ->
@@ -206,6 +193,8 @@ class StackerActivity : ComponentActivity() {
         var doStacking by remember { mutableStateOf(false) }
         var doAnalyze by remember { mutableStateOf(false) }
         var doComputeVariance by remember { mutableStateOf(false) }
+        var shifts by remember { mutableStateOf<List<Pair<Int, Int>>?>(emptyList()) }
+        var sharps by remember { mutableStateOf<List<Double>>(emptyList()) }
 
         // Stack
         if (doStacking) {
@@ -216,18 +205,18 @@ class StackerActivity : ComponentActivity() {
         // Analyze (images shifts)
         if (doAnalyze)  {
             Toast.makeText(context, "Analyzing images", Toast.LENGTH_SHORT).show()
-            analyzeImages(context)
+            shifts = analyzeImages(context)
             doAnalyze = false
         }
 
         // Compute Variance
         if (doComputeVariance)  {
             Toast.makeText(context, "Compute Variance", Toast.LENGTH_SHORT).show()
-            computeVariance(context)
+            sharps = computeVariance(context)
             doComputeVariance = false
         }
 
-        // UI DI STACKING --------------  RIFARE --------------------
+        // Stacking UI
         Scaffold(
             bottomBar = {
                 BottomBar(
@@ -236,24 +225,63 @@ class StackerActivity : ComponentActivity() {
                     onComputeVariance = {doComputeVariance = true})
             }
         ) { innerPadding ->
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                Text(
-                    text = "Stack",
-                    fontSize = 60.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Green,
-                    modifier = Modifier.padding(start = 90.dp, top = 120.dp)
-                )
-                Image(
-                    painter = painterResource(id = R.drawable.stack),
-                    contentDescription = null,
-                    modifier = Modifier.padding(start = 10.dp, top = 250.dp)
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Stack",
+                        fontSize = 60.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Green,
+                        modifier = Modifier.padding(start = 90.dp, top = 80.dp)
+                    )
+                    Image(
+                        painter = painterResource(id = R.drawable.stack),
+                        contentDescription = null,
+                        modifier = Modifier.padding(start = 10.dp, top = 40.dp)
+                    )
+
+                    // Show the shifts of each image
+                    if (shifts!!.isNotEmpty()) {
+                        Text(
+                            text = "Shifts",
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 40.dp)
+                        )
+                        shifts!!.forEachIndexed { index, v ->
+                            val msg1 = "Photo " + (index+1).toString()
+                            val msg2 = " = (" + v.first.toString() + ", " + v.second.toString() + ")"
+                            Text(
+                                 msg1+msg2,
+                                 fontSize = 20.sp
+                            )
+                        }
+                    }
+
+                    // Show the variance of each image
+                    if (sharps.isNotEmpty()) {
+                        Text(
+                            text = "Variance",
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 40.dp)
+                        )
+
+                        sharps.forEachIndexed { index, v ->
+                            Text(
+                                "Photo" + (index+1).toString() + " → ${"%.2f".format(v)}",
+                                fontSize = 20.sp)
+                        }
+                    }
+                }
             }
         }
     }
@@ -329,3 +357,39 @@ class StackerActivity : ComponentActivity() {
         }
     }
 }
+
+/*fun listAllImages(context: Context): List<Uri> {
+    val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+    //val uriString = prefs.getString("cameraX_tree_uri", null) ?: return emptyList()
+    val uriString = prefs.getString("cameraX", null) ?: return emptyList()
+
+    val treeUri = uriString.toUri()
+    val docTree = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyList()
+
+    return docTree.listFiles()
+        .filter { it.isFile && it.name?.endsWith(".jpg", true) == true }
+        .map { it.uri }
+}*/
+
+/*val images: List<Uri> = listAllImages(context)
+       Log.v(TAG, images.count().toString())
+
+       for (uri in images) {
+           val bmp = stacker.loadBitmapFromUri(context, uri)
+           if (bmp != null) {
+               val sharpness = stacker.laplacianVariance(bmp)
+               Log.e(TAG, "File=${uri.lastPathSegment} sharpness=$sharpness")
+               bmp.recycle()
+           }
+       }*/
+
+/*fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
+    return try {
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            BitmapFactory.decodeStream(input)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}*/
