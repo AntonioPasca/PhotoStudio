@@ -19,6 +19,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.ImageFormat
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -44,6 +45,7 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import java.io.File
 
 
 // --------------------------------------------------------------------------
@@ -118,8 +120,11 @@ class PhotoActivity : ComponentActivity() {
         var doMultiplePhotos by remember {mutableStateOf(false)}
 
         if (doSinglePhoto) {
+            val newFolder =  createSessionDirectory()
+            Log.v(TAG, newFolder.toString())
             TakeSinglePhoto(
                 controller = controller,
+                newFolder,
                 onFinished = {doSinglePhoto = false})
         }
 
@@ -165,6 +170,7 @@ class PhotoActivity : ComponentActivity() {
     @Composable
     fun TakeSinglePhoto(
         controller: LifecycleCameraController,
+        folder: File,
         onFinished: () -> Unit
     ) {
         val context = LocalContext.current
@@ -180,8 +186,8 @@ class PhotoActivity : ComponentActivity() {
             }
         }
 
+        // Countdown
         LaunchedEffect(Unit) {
-            // Countdown
             while (secondsLeft > 0) {
                 delay(1000)
                 secondsLeft--
@@ -195,6 +201,7 @@ class PhotoActivity : ComponentActivity() {
                 cameraLib.takePhotoRaw(
                     context,
                     controller,
+                    folder,
                     onSaved = { message = "RAW saved" },
                     onError = { message = "RAW error" })
             }
@@ -202,6 +209,7 @@ class PhotoActivity : ComponentActivity() {
                 cameraLib.takePhotoJpg(
                     context,
                     controller,
+                    folder,
                     onSaved = { message = "JPEG saved" },
                     onError = { message = "JPEG error" })
             }
@@ -235,6 +243,13 @@ class PhotoActivity : ComponentActivity() {
         var secondsLeft by remember { mutableIntStateOf(Settings.photoBeepDelay) }
         var showCountDown by remember { mutableStateOf(true) }
         var message by remember { mutableStateOf<String?>(null) }
+        var createNewDir by remember { mutableStateOf< Boolean>(true) }
+        var newFolder = File("")
+
+        if (createNewDir) {
+            newFolder = createSessionDirectory()
+            createNewDir = false
+        }
 
         // Auto-hide message
         LaunchedEffect(message) {
@@ -245,7 +260,6 @@ class PhotoActivity : ComponentActivity() {
         }
 
         LaunchedEffect(Unit) {
-
             // Countdown
             while (secondsLeft > 0) {
                 delay(1000)
@@ -254,16 +268,15 @@ class PhotoActivity : ComponentActivity() {
                     beep(100,20)
                 }
             }
-
             showCountDown = false
 
             // Multiple photo loop
             for (showShotIdx in 0 until Settings.photoNumMultiple) {
-
                 if (Settings.photoRawEnabled) {
                     cameraLib.takePhotoRaw(
                         context,
                         controller,
+                        newFolder,
                         onSaved = { message = "RAW shot " + (showShotIdx +1).toString()},
                         onError = { message = "RAW error on shot " + (showShotIdx +1).toString()})
                 }
@@ -271,13 +284,13 @@ class PhotoActivity : ComponentActivity() {
                     cameraLib.takePhotoJpg(
                         context,
                         controller,
+                        newFolder,
                         onSaved = { message = "JPG shot " + (showShotIdx +1).toString() },
                         onError = { message = "JPG error on shot " + (showShotIdx +1).toString()})
                         onFinishedSingle()
                 }
 
                 delay(Settings.delayBetweenPhotos)
-
             }
             onEnd()
         }

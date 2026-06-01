@@ -21,7 +21,6 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.camera.core.CameraSelector
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -364,8 +363,9 @@ object Settings {
     var photoRawEnabled = true
     var photoBeepDelay = 5
     var photoNumMultiple = 3
-    var delayBetweenPhotos = 2000L    // (in ms)
-    var photoPath = "Pictures/CameraX"
+    var delayBetweenPhotos = 200L    // (in ms)
+    //var photoPath = "Pictures/CameraX"
+    var photoPath = "Pictures/AstroPhoto"
 
     var videoStartBeepEnabled = true
     var videoStopBeepEnabled = true

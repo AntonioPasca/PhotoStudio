@@ -76,6 +76,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.set
 import androidx.core.graphics.createBitmap
 import android.hardware.camera2.CameraManager
+import java.io.File
 
 
 // ----------------------------------------------------------------------
@@ -308,6 +309,7 @@ class CameraLib {
     fun takePhotoJpg(
         context: Context,
         controller: CameraController,
+        folder: File,
         onSaved: () -> Unit,
         onError: () -> Unit
     ) {
@@ -316,7 +318,8 @@ class CameraLib {
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, Settings.photoPath)
+            //put(MediaStore.Images.Media.RELATIVE_PATH, Settings.photoPath)
+            put(MediaStore.Images.Media.RELATIVE_PATH, folder.toString())
         }
 
         val outputOptions = ImageCapture.OutputFileOptions
@@ -350,6 +353,7 @@ class CameraLib {
     fun takePhotoRaw(
         context: Context,
         controller: CameraController,
+        folder: File,
         onSaved: () -> Unit,
         onError: (ImageCaptureException) -> Unit
     ) {
@@ -358,7 +362,7 @@ class CameraLib {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, "$nameBase.dng")
             put(MediaStore.MediaColumns.MIME_TYPE, "image/x-adobe-dng")
-            put(MediaStore.Images.Media.RELATIVE_PATH, Settings.photoPath)
+            put(MediaStore.Images.Media.RELATIVE_PATH, folder.toString())
         }
 
         val output = ImageCapture.OutputFileOptions

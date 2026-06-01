@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -106,7 +105,7 @@ class StackerActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     // ToDo
     //      Intermediate messages
-    //      a) Evaluating shifs
+    //      a) Evaluating shifts
     //      b) Aligning Images
     //      c) STacking images
     // ----------------------------------------------------------------------
@@ -138,7 +137,7 @@ class StackerActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     private fun analyzeImages(context: Context): List<Pair<Int, Int>>? {
 
-        val (shifts, w, h) = stacker.getImagesShifts()
+        val (shifts, _, _) = stacker.getImagesShifts()
         if (shifts == null)
             Toast.makeText(context, "No images to analyze", Toast.LENGTH_SHORT).show()
         else {
@@ -157,7 +156,7 @@ class StackerActivity : ComponentActivity() {
 
         val sharps = mutableListOf<Double>()
         val files = stacker.getPictures()
-        for ((index, file) in files.withIndex()) {
+        for ((_, file) in files.withIndex()) {
             val bmp = BitmapFactory.decodeFile(file.absolutePath)
             if (bmp != null) {
                 val sharpness = stacker.laplacianVariance(bmp)
@@ -170,15 +169,15 @@ class StackerActivity : ComponentActivity() {
     }
 
 
-    /* Come usare la varianza per cancellare foto non buone
+    /* How to use variance to discard bad images
     val scores = frames.map { frame ->
         laplacianVariance(frame)
     }
 
-    // Ordina per nitidezza
+    // Sort
     val sorted = scores.zip(frames).sortedByDescending { it.first }
 
-    // Tieni il top 30%
+    // Get top 30%
     val keepCount = (sorted.size * 0.30).toInt()
     val bestFrames = sorted.take(keepCount).map { it.second }
     */
