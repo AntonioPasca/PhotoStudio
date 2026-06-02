@@ -114,7 +114,6 @@ class StackerActivity : ComponentActivity() {
         Box(modifier = Modifier.fillMaxSize()) {
 
             Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
-            //ShowMessage("Stacking in progress", 80.sp)
             if (Settings.stackerBeepEnabled) {
                 beep(100, 20)
             }
@@ -146,6 +145,9 @@ class StackerActivity : ComponentActivity() {
                 Log.v(TAG, shifts[i].toString())
             Toast.makeText(context, "Done", Toast.LENGTH_SHORT).show()
         }
+
+        Log.v(TAG, "Analyze")
+        Log.v(TAG, shifts!!.count().toString())
         return shifts
     }
 

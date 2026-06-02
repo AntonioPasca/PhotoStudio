@@ -363,7 +363,7 @@ object Settings {
     var photoRawEnabled = true
     var photoBeepDelay = 5
     var photoNumMultiple = 3
-    var delayBetweenPhotos = 200L    // (in ms)
+    var delayBetweenPhotos = 400L    // (in ms)
     //var photoPath = "Pictures/CameraX"
     var photoPath = "Pictures/AstroPhoto"
 

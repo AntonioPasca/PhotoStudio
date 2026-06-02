@@ -36,7 +36,7 @@ import kotlin.math.sqrt
 class Stacker {
 
     val cameraLib = CameraLib()
-    val buffers = mutableListOf<ByteArray>()
+    var buffers = mutableListOf<ByteArray>()
 
     // ----------------------------------------------------------------------
     // executeStacking
@@ -77,6 +77,12 @@ class Stacker {
 
         // Get all the pictures - Return if less than two
         val files = getPictures()
+
+        Log.v(TAG, "Images?")
+        Log.v(TAG, files.count().toString())
+
+        buffers.clear()
+
         if (files.count() < 2)
             return Triple(null, 0, 0)
 
@@ -119,8 +125,7 @@ class Stacker {
 
         val picturesDir =
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-        val path = File(picturesDir, "CameraX").absolutePath
-
+        val path = File(picturesDir, "AstroPhoto").absolutePath
         val dir = File(path)
 
         val files = dir.listFiles { f ->

@@ -37,7 +37,7 @@ import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 
 
 private const val APP_NAME = "AstroPhoto"
-private const val VERSION =  "Ver 0.6.6"
+private const val VERSION =  "Ver 0.7.0"
 const val TAG = "PHOTO"
 
 // --------------------------------------------------------------------------
