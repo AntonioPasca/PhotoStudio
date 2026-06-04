@@ -7,9 +7,9 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.6.0
+// Version:     Rel. 0.7.0
 //
-// Date:        May 2026
+// Date:        June 2026
 //
 // Module:      CameraLib.kt
 // --------------------------------------------------------------------------
@@ -76,8 +76,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.set
 import androidx.core.graphics.createBitmap
 import android.hardware.camera2.CameraManager
+import android.util.Log
 import java.io.File
 
+const val PHOTO_JPEG = 0
+const val PHOTO_RAW  = 1
 
 // ----------------------------------------------------------------------
 // CLASS CameraLib
@@ -118,11 +121,14 @@ class CameraLib {
     @Composable
     fun CameraPreview(
         controller: LifecycleCameraController,
-        modifier: Modifier
+        modifier: Modifier,
+        focusPeakingBitmap: Bitmap? // <- to the analyzer
     ) {
         val zoomState: ZoomState? by controller.zoomState.observeAsState()
 
         Box(modifier = Modifier.fillMaxSize()) {
+
+            // PREVIEW CAMERA
             AndroidView(
                 factory = { context ->
                     PreviewView(context).apply {
@@ -130,10 +136,25 @@ class CameraLib {
                         scaleType = PreviewView.ScaleType.FILL_CENTER
                     }
                 },
-                modifier.fillMaxSize()
+                modifier = modifier.fillMaxSize()
             )
 
-            // Slider di zoom
+            // Overlay Focus peaking
+            if (focusPeakingBitmap != null) {
+                Log.v(TAG, "Focus active")
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { context ->
+                        FocusPeakingView(context)
+                    },
+                    update = { view ->
+                        view.edges = focusPeakingBitmap
+                        view.invalidate()
+                    }
+                )
+            }
+
+            // SLIDER ZOOM
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -271,7 +292,6 @@ class CameraLib {
     //  Note
     //      These values should be confirmed !!!!!!!!!!!!
     // ----------------------------------------------------------------------
-    //@Composable
     fun isRawSupported(context: Context, cameraId: String): Boolean {
         val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         val characteristics = manager.getCameraCharacteristics(cameraId)
@@ -295,7 +315,8 @@ class CameraLib {
                 cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                 setEnabledUseCases(
                     CameraController.IMAGE_CAPTURE or
-                            CameraController.VIDEO_CAPTURE
+                    CameraController.VIDEO_CAPTURE or
+                    CameraController.IMAGE_ANALYSIS
                 )
             }
         }
@@ -304,21 +325,33 @@ class CameraLib {
     }
 
     // ----------------------------------------------------------------------
-    // takePhotoJpg
+    // takePhoto
     // ----------------------------------------------------------------------
-    fun takePhotoJpg(
+    // Input
+    //      photoType: 0 = JPEG
+    //                 1 = RAW
+    //      folder:    path where to save photo
+    //                 /Pictures/AstroPhoto + <mmm><dd>_<hhmmss>
+    //      photoIdx:  Photo sequence number
+    // ----------------------------------------------------------------------
+    fun takePhoto(
         context: Context,
         controller: CameraController,
+        photoType: Int,
         folder: File,
+        photoIdx: Int,
         onSaved: () -> Unit,
         onError: () -> Unit
     ) {
-        val name = "IMG_${System.currentTimeMillis()}.jpg"
+        //val name = "IMG_${System.currentTimeMillis()}.jpg"
+        var mimeType = "image/jpeg"
+        if (photoType == PHOTO_RAW)
+            mimeType = "image/x-adobe-dng"
 
+        val name = "Photo_$photoIdx"
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            //put(MediaStore.Images.Media.RELATIVE_PATH, Settings.photoPath)
+            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
             put(MediaStore.Images.Media.RELATIVE_PATH, folder.toString())
         }
 
@@ -348,47 +381,6 @@ class CameraLib {
     }
 
     // ----------------------------------------------------------------------
-    // takePhotoRaw
-    // ----------------------------------------------------------------------
-    fun takePhotoRaw(
-        context: Context,
-        controller: CameraController,
-        folder: File,
-        onSaved: () -> Unit,
-        onError: (ImageCaptureException) -> Unit
-    ) {
-        val nameBase = "RAW_${System.currentTimeMillis()}"
-
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, "$nameBase.dng")
-            put(MediaStore.MediaColumns.MIME_TYPE, "image/x-adobe-dng")
-            put(MediaStore.Images.Media.RELATIVE_PATH, folder.toString())
-        }
-
-        val output = ImageCapture.OutputFileOptions
-            .Builder(
-                context.contentResolver,
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                values
-            )
-            .build()
-
-        controller.takePicture(
-            output,
-            ContextCompat.getMainExecutor(context),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onError(exc: ImageCaptureException) {
-                    onError(exc)
-                }
-
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    onSaved()
-                }
-            }
-        )
-    }
-
-    // ----------------------------------------------------------------------
     // saveBitmapToGallery
     // ----------------------------------------------------------------------
     fun saveBitmapToGallery(
@@ -398,7 +390,6 @@ class CameraLib {
         folder: String
     ): Uri? {
 
-        val folder1 = "DCIM/Camera"
         val contentValues = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, filename)
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")

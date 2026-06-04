@@ -7,19 +7,23 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.6.0
+// Version:     Rel. 0.7.0
 //
-// Date:        May 2026
+// Date:        June 2026
 //
 // Module:      MainActivity.kt
 // --------------------------------------------------------------------------
 package com.pascagames.photostudio
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
-import android.graphics.ImageFormat
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.camera.core.ImageCapture
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -46,6 +49,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.io.File
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 
 // --------------------------------------------------------------------------
@@ -55,12 +60,7 @@ class PhotoActivity : ComponentActivity() {
 
     private var backToCaller: (Unit) -> Unit = { back() }
     val cameraLib = CameraLib()
-
-    @SuppressLint("RestrictedApi")
-    val rawImageCapture = ImageCapture.Builder()
-        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-        .setBufferFormat(ImageFormat.RAW_SENSOR)
-        .build()
+    private lateinit var cameraExecutor: ExecutorService
 
     // ----------------------------------------------------------------------
     // onCreate
@@ -68,6 +68,8 @@ class PhotoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        cameraExecutor = Executors.newSingleThreadExecutor()
 
        /* var title = "Photo (Jpg Format)"
         if (Settings.photoRawEnabled)
@@ -86,6 +88,14 @@ class PhotoActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // --------------------------------------------------------------------------
+    // onDestroy
+    // --------------------------------------------------------------------------
+    override fun onDestroy() {
+        super.onDestroy()
+        cameraExecutor.shutdown()
     }
 
     // --------------------------------------------------------------------------
@@ -110,24 +120,56 @@ class PhotoActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     // MainScreen
     // ----------------------------------------------------------------------
+    @SuppressLint("UnrememberedMutableState")
     @Composable
     fun MainScreen(modifier: Modifier = Modifier) {
 
         val context = LocalContext.current
-        val controller = cameraLib.rememberCameraController(context)
         val lifecycleOwner = LocalLifecycleOwner.current
+
+        // CameraX controller
+        val controller = cameraLib.rememberCameraController(context)
+
+        // UI States
+        var doFocus by remember {mutableStateOf(false)}
         var doSinglePhoto by remember {mutableStateOf(false)}
         var doMultiplePhotos by remember {mutableStateOf(false)}
 
+        // Bitmap for overlay focus peaking
+        val focusPeakingBitmap = mutableStateOf<Bitmap?>(null)
+
+        // Bind controller to lifecycle
+        LaunchedEffect(Unit) {
+            controller.bindToLifecycle(lifecycleOwner)
+        }
+
+        // Focus Peaking management
+        LaunchedEffect(doFocus) {
+            if (doFocus) {
+                Log.v(TAG, "Focus peaking ON")
+                controller.setImageAnalysisAnalyzer(
+                    cameraExecutor,
+                    FocusPeakingAnalyzer { edges ->
+                        focusPeakingBitmap.value = edges
+                    }
+                )
+            } else {
+                Log.v(TAG, "Focus peaking OFF")
+                controller.clearImageAnalysisAnalyzer()
+                focusPeakingBitmap.value = null
+            }
+        }
+
+        // Single Photo
         if (doSinglePhoto) {
             val newFolder =  createSessionDirectory()
-            Log.v(TAG, newFolder.toString())
             TakeSinglePhoto(
                 controller = controller,
                 newFolder,
                 onFinished = {doSinglePhoto = false})
         }
 
+        // MultiplePhotos
         if (doMultiplePhotos) {
             TakeMultiplePhotos(
                 controller = controller,
@@ -146,6 +188,7 @@ class PhotoActivity : ComponentActivity() {
         Scaffold(
             bottomBar = {
                 BottomBar(
+                    {doFocus = !doFocus},
                     {doSinglePhoto = true},
                     onMultiplePhotos = {doMultiplePhotos = true}
                )
@@ -157,8 +200,9 @@ class PhotoActivity : ComponentActivity() {
                     .padding(innerPadding)
             ) {
                 cameraLib.CameraPreview(
-                    controller,
-                    modifier = Modifier.fillMaxSize()
+                    controller = controller,
+                    modifier = Modifier.fillMaxSize(),
+                    focusPeakingBitmap = focusPeakingBitmap.value
                 )
             }
         }
@@ -198,18 +242,22 @@ class PhotoActivity : ComponentActivity() {
 
             // Take RAW or JPG photo
             if (Settings.photoRawEnabled) {
-                cameraLib.takePhotoRaw(
+                cameraLib.takePhoto(
                     context,
                     controller,
+                    PHOTO_RAW,
                     folder,
+                    1,
                     onSaved = { message = "RAW saved" },
                     onError = { message = "RAW error" })
             }
                 else {
-                cameraLib.takePhotoJpg(
+                cameraLib.takePhoto(
                     context,
                     controller,
+                    PHOTO_JPEG,
                     folder,
+                    1,
                     onSaved = { message = "JPEG saved" },
                     onError = { message = "JPEG error" })
             }
@@ -243,7 +291,7 @@ class PhotoActivity : ComponentActivity() {
         var secondsLeft by remember { mutableIntStateOf(Settings.photoBeepDelay) }
         var showCountDown by remember { mutableStateOf(true) }
         var message by remember { mutableStateOf<String?>(null) }
-        var createNewDir by remember { mutableStateOf< Boolean>(true) }
+        var createNewDir by remember { mutableStateOf(true) }
         var newFolder = File("")
 
         if (createNewDir) {
@@ -273,18 +321,22 @@ class PhotoActivity : ComponentActivity() {
             // Multiple photo loop
             for (showShotIdx in 0 until Settings.photoNumMultiple) {
                 if (Settings.photoRawEnabled) {
-                    cameraLib.takePhotoRaw(
+                    cameraLib.takePhoto(
                         context,
                         controller,
+                        PHOTO_RAW,
                         newFolder,
+                        showShotIdx+1,
                         onSaved = { message = "RAW shot " + (showShotIdx +1).toString()},
                         onError = { message = "RAW error on shot " + (showShotIdx +1).toString()})
                 }
                 else {
-                    cameraLib.takePhotoJpg(
+                    cameraLib.takePhoto(
                         context,
                         controller,
+                        PHOTO_JPEG,
                         newFolder,
+                        showShotIdx+1,
                         onSaved = { message = "JPG shot " + (showShotIdx +1).toString() },
                         onError = { message = "JPG error on shot " + (showShotIdx +1).toString()})
                         onFinishedSingle()
@@ -309,10 +361,30 @@ class PhotoActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     @Composable
     fun BottomBar(
+        onFocus: () -> Unit,
         onPhoto: () -> Unit,
         onMultiplePhotos: () -> Unit){
 
         NavigationBar {
+            NavigationBarItem(
+                selected = true,
+                onClick = onFocus,
+                icon = {
+                    Icon(
+                        painterResource(id = R.drawable.focus),
+                        contentDescription = null
+                    )
+                },
+                label = { Text("Focus peaking") },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.Green,
+                    unselectedIconColor = Color.White,
+                    selectedTextColor = Color.White,
+                    unselectedTextColor = Color.Gray,
+                    indicatorColor = Color.Transparent
+                )
+            )
+
             NavigationBarItem(
                 selected = true,
                 onClick = onPhoto,
@@ -350,6 +422,17 @@ class PhotoActivity : ComponentActivity() {
                     indicatorColor = Color.Transparent
                 )
             )
+        }
+    }
+}
+
+class FocusPeakingView(context: Context) : View(context) {
+    var edges: Bitmap? = null
+
+    @SuppressLint("DrawAllocation")
+    override fun onDraw(canvas: Canvas) {
+        edges?.let {
+            canvas.drawBitmap(it, null, Rect(0, 0, width, height), null)
         }
     }
 }

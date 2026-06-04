@@ -7,9 +7,9 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.6.0
+// Version:     Rel. 0.7.0
 //
-// Date:        May 2026
+// Date:        June 2026
 //
 // Module:      Stacker.kt
 // --------------------------------------------------------------------------
@@ -48,7 +48,8 @@ class Stacker {
     // ----------------------------------------------------------------------
     fun executeStacking(
         context: Context,
-        folder: String
+        onImageShifting: () -> Unit
+
     ): Boolean {
 
         // Get the shift of the images
@@ -57,6 +58,8 @@ class Stacker {
         // No stack possible if there are less than two files
         if (shifts == null)
             return false
+
+        onImageShifting()
 
         // Do the final stack
         val resultArray = stack(buffers, shifts, width, height)

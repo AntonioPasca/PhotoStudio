@@ -7,9 +7,9 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.6.0
+// Version:     Rel. 0.7.0
 //
-// Date:        May 2026
+// Date:        June 2026
 //
 // Module:      MainActivity.kt
 // --------------------------------------------------------------------------
@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import android.content.Intent
+import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.camera.video.Recording
 import androidx.camera.view.LifecycleCameraController
@@ -105,6 +106,7 @@ class VideoActivity : ComponentActivity() {
     // MainScreen
     // ----------------------------------------------------------------------
     //@RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    @SuppressLint("UnrememberedMutableState")
     @Composable
     fun MainScreen(modifier: Modifier = Modifier) {
 
@@ -114,13 +116,10 @@ class VideoActivity : ComponentActivity() {
         var startDelayedVideo by remember {mutableStateOf(false)}
         var showVideoProgress by remember {mutableStateOf(false)}
         var showStartVideoMsg by remember {mutableStateOf(false)}
+        val focusPeakingBitmap = mutableStateOf<Bitmap?>(null)
 
         val permissionsGranted = cameraLib.getAudioPermission() && cameraLib.getCameraPermission()
         val granted = cameraLib.getAudioPermission()
-
-        //if (granted) {
-        //    val audioConfig = AudioConfig.create(false)
-        //}
 
         if (startDelayedVideo) {
 
@@ -157,7 +156,8 @@ class VideoActivity : ComponentActivity() {
             ) {
                 cameraLib.CameraPreview(
                     controller,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    focusPeakingBitmap = focusPeakingBitmap.value
                 )
 
                 if (showStartVideoMsg) {

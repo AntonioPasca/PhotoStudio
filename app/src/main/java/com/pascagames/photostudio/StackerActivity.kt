@@ -7,9 +7,9 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.6.0
+// Version:     Rel. 0.7.0
 //
-// Date:        May 2026
+// Date:        June 2026
 //
 // Module:      StackerActivity.kt
 // --------------------------------------------------------------------------
@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -36,6 +38,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
+import kotlinx.coroutines.delay
 
 
 // --------------------------------------------------------------------------
@@ -110,7 +114,9 @@ class StackerActivity : ComponentActivity() {
     //      c) STacking images
     // ----------------------------------------------------------------------
     @Composable
-    fun Stack(context: Context) {
+    fun Stack(
+                context: Context,
+                onImageShifting: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
 
             Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
@@ -118,7 +124,7 @@ class StackerActivity : ComponentActivity() {
                 beep(100, 20)
             }
 
-            val result = stacker.executeStacking(context, Settings.photoPath)
+            val result = stacker.executeStacking(context, onImageShifting)
             if (!result) {
                 beep(100, 20)
                 Toast.makeText(context, "Nothing to stack", Toast.LENGTH_SHORT).show()
@@ -145,9 +151,6 @@ class StackerActivity : ComponentActivity() {
                 Log.v(TAG, shifts[i].toString())
             Toast.makeText(context, "Done", Toast.LENGTH_SHORT).show()
         }
-
-        Log.v(TAG, "Analyze")
-        Log.v(TAG, shifts!!.count().toString())
         return shifts
     }
 
@@ -197,9 +200,25 @@ class StackerActivity : ComponentActivity() {
         var shifts by remember { mutableStateOf<List<Pair<Int, Int>>?>(emptyList()) }
         var sharps by remember { mutableStateOf<List<Double>>(emptyList()) }
 
+        var message by remember { mutableStateOf<String?>(null) }
+
+        // Auto-hide message
+        LaunchedEffect(message) {
+            if (message != null) {
+                delay(5000)
+                message = null
+            }
+        }
+
+        // Show message
+        if (message != null)
+            ShowMessage(message!!, 22.sp)
+
         // Stack
         if (doStacking) {
-            Stack(context)
+            Stack(
+                context,
+                onImageShifting = {message = "Image shifted"})
             doStacking = false
         }
 
@@ -235,6 +254,7 @@ class StackerActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp)
+                        .verticalScroll(rememberScrollState())
                 ) {
                     Text(
                         text = "Stack",
@@ -250,7 +270,7 @@ class StackerActivity : ComponentActivity() {
                     )
 
                     // Show the shifts of each image
-                    if (shifts!!.isNotEmpty()) {
+                    if (!shifts.isNullOrEmpty()) {
                         Text(
                             text = "Shifts",
                             fontSize = 30.sp,
@@ -358,39 +378,3 @@ class StackerActivity : ComponentActivity() {
         }
     }
 }
-
-/*fun listAllImages(context: Context): List<Uri> {
-    val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
-    //val uriString = prefs.getString("cameraX_tree_uri", null) ?: return emptyList()
-    val uriString = prefs.getString("cameraX", null) ?: return emptyList()
-
-    val treeUri = uriString.toUri()
-    val docTree = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyList()
-
-    return docTree.listFiles()
-        .filter { it.isFile && it.name?.endsWith(".jpg", true) == true }
-        .map { it.uri }
-}*/
-
-/*val images: List<Uri> = listAllImages(context)
-       Log.v(TAG, images.count().toString())
-
-       for (uri in images) {
-           val bmp = stacker.loadBitmapFromUri(context, uri)
-           if (bmp != null) {
-               val sharpness = stacker.laplacianVariance(bmp)
-               Log.e(TAG, "File=${uri.lastPathSegment} sharpness=$sharpness")
-               bmp.recycle()
-           }
-       }*/
-
-/*fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
-    return try {
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            BitmapFactory.decodeStream(input)
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
-        null
-    }
-}*/
