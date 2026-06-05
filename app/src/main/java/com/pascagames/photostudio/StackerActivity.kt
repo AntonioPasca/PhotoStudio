@@ -25,6 +25,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -109,14 +110,12 @@ class StackerActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     // ToDo
     //      Intermediate messages
-    //      a) Evaluating shifts
-    //      b) Aligning Images
-    //      c) STacking images
     // ----------------------------------------------------------------------
     @Composable
     fun Stack(
                 context: Context,
-                onImageShifting: () -> Unit) {
+                onImageShifting: (Int) -> Unit,
+                onImagesShifting: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
 
             Toast.makeText(context, "Stacking started", Toast.LENGTH_SHORT).show()
@@ -124,8 +123,12 @@ class StackerActivity : ComponentActivity() {
                 beep(100, 20)
             }
 
-            val result = stacker.executeStacking(context, onImageShifting)
-            if (!result) {
+            val (result, stackedBitmap) = stacker.executeStacking(context, onImageShifting, onImagesShifting)
+            if (result) {
+                Toast.makeText(context, "Sharpening", Toast.LENGTH_SHORT).show()
+                val sharpened = stacker.unsharpMask(context,stackedBitmap!!, Settings.stackerSharpening.toFloat())
+            }
+            else {
                 beep(100, 20)
                 Toast.makeText(context, "Nothing to stack", Toast.LENGTH_SHORT).show()
             }
@@ -140,9 +143,10 @@ class StackerActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     // analyzeImages
     // ----------------------------------------------------------------------
-    private fun analyzeImages(context: Context): List<Pair<Int, Int>>? {
+    private fun analyzeImages(context: Context,
+                              onImageShifting: (Int) -> Unit,): List<Pair<Int, Int>>? {
 
-        val (shifts, _, _) = stacker.getImagesShifts()
+        val (shifts, _, _) = stacker.getImagesShifts(onImageShifting)
         if (shifts == null)
             Toast.makeText(context, "No images to analyze", Toast.LENGTH_SHORT).show()
         else {
@@ -218,14 +222,18 @@ class StackerActivity : ComponentActivity() {
         if (doStacking) {
             Stack(
                 context,
-                onImageShifting = {message = "Image shifted"})
+                onImageShifting = {message = "Image shifted"},
+                onImagesShifting = {message = "Images shifted"})
             doStacking = false
         }
 
         // Analyze (images shifts)
         if (doAnalyze)  {
             Toast.makeText(context, "Analyzing images", Toast.LENGTH_SHORT).show()
-            shifts = analyzeImages(context)
+            shifts = analyzeImages(
+                                    context,
+                                    onImageShifting = {message = "Image shifted"},
+                                  )
             doAnalyze = false
         }
 
@@ -285,6 +293,13 @@ class StackerActivity : ComponentActivity() {
                                  fontSize = 20.sp
                             )
                         }
+                    }
+                    else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black)
+                        )
                     }
 
                     // Show the variance of each image

@@ -22,6 +22,7 @@ import android.os.Environment
 import android.util.Log
 import java.io.File
 import kotlin.math.sqrt
+import androidx.core.graphics.createBitmap
 
 // ----------------------------------------------------------------------
 // CLASS Stacker
@@ -29,6 +30,9 @@ import kotlin.math.sqrt
 // Public Methods
 //      fun executeStacking(context: Context, folder: String)
 //      fun getImagesShifts(): Triple<List<Pair<Int, Int>>?, Int, Int>
+//      fun getPictures(): Array<File>
+//      fun laplacianVariance(bitmap: Bitmap): Double {
+//      fun unsharpMask(original: Bitmap, amount: Float = 0.3f): Bitmap
 // ----------------------------------------------------------------------
 // Used component
 //      CameraLib
@@ -48,18 +52,18 @@ class Stacker {
     // ----------------------------------------------------------------------
     fun executeStacking(
         context: Context,
-        onImageShifting: () -> Unit
-
-    ): Boolean {
+        onImageShifting: (Int) -> Unit,
+        onImagesShifting: () -> Unit
+    ): Pair<Boolean, Bitmap?> {
 
         // Get the shift of the images
-        val (shifts, width, height)  = getImagesShifts()
+        val (shifts, width, height)  = getImagesShifts(onImageShifting)
         
         // No stack possible if there are less than two files
         if (shifts == null)
-            return false
+            return Pair(false, null)
 
-        onImageShifting()
+        onImagesShifting()
 
         // Do the final stack
         val resultArray = stack(buffers, shifts, width, height)
@@ -68,15 +72,18 @@ class Stacker {
         val finalBitmap = cameraLib.floatArrayToBitmap(resultArray, width, height)
 
         // Save
-        val name = "Stacked_${System.currentTimeMillis()}.jpg"
+        //val name = "Stacked_${System.currentTimeMillis()}.jpg"
+        val name = "StackedImg.jpg"
         cameraLib.saveBitmapToGallery(context, finalBitmap, name, Settings.photoPath)
-        return true
+        return Pair(true, finalBitmap)
     }
 
     // ----------------------------------------------------------------------
     // getImagesShifts
     // ----------------------------------------------------------------------
-    fun getImagesShifts(): Triple<List<Pair<Int, Int>>?, Int, Int> {
+    fun getImagesShifts(
+        onShifting: (Int) -> Unit
+    ): Triple<List<Pair<Int, Int>>?, Int, Int> {
 
         // Get all the pictures - Return if less than two
         val files = getPictures()
@@ -98,6 +105,7 @@ class Stacker {
         // Add all images
         for ((index, file) in files.withIndex()) {
 
+            onShifting(index)
             val bmpRotated = cameraLib.fixBitmapRotation(file.absolutePath)
             buffers += cameraLib.bitmapToByteArray(bmpRotated)
             bmpRotated.recycle()
@@ -119,8 +127,6 @@ class Stacker {
         return Triple(shifts, width, height)
     }
 
-    // Private Methods
-
     // ----------------------------------------------------------------------
     // getPictures
     // ----------------------------------------------------------------------
@@ -136,6 +142,141 @@ class Stacker {
         } ?: emptyArray()
 
         return files
+    }
+
+    // ----------------------------------------------------------------------
+    // laplacianVariance
+    // ----------------------------------------------------------------------
+    fun laplacianVariance(bitmap: Bitmap): Double {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        // Convert to luminance (Y)
+        val gray = DoubleArray(width * height)
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val r = (p shr 16) and 0xFF
+            val g = (p shr 8) and 0xFF
+            val b = p and 0xFF
+            gray[i] = 0.299*r + 0.587*g + 0.114*b
+        }
+
+        // Laplacian Kernel  3x3
+        val kernel = arrayOf(
+            intArrayOf(0,  1, 0),
+            intArrayOf(1, -4, 1),
+            intArrayOf(0,  1, 0)
+        )
+
+        val lap = DoubleArray(width * height)
+
+        for (y in 1 until height-1) {
+            for (x in 1 until width-1) {
+                var sum = 0.0
+                for (ky in -1..1) {
+                    for (kx in -1..1) {
+                        val px = x + kx
+                        val py = y + ky
+                        val weight = kernel[ky+1][kx+1]
+                        sum += gray[py * width + px] * weight
+                    }
+                }
+                lap[y * width + x] = sum
+            }
+        }
+
+        // Compute variance
+        val mean = lap.average()
+        var variance = 0.0
+        for (v in lap) variance += (v - mean) * (v - mean)
+        return variance / lap.size
+    }
+
+    // ----------------------------------------------------------------------
+    // unsharpMask
+    // ----------------------------------------------------------------------
+    fun unsharpMask(context: Context, original: Bitmap, amount: Float = 0.3f): Bitmap {
+        val w = original.width
+        val h = original.height
+
+        val blurred = boxBlur(original)
+        val sharpedBitmap = createBitmap(w, h)
+
+        val origPx = IntArray(w * h)
+        val blurPx = IntArray(w * h)
+        val outPx = IntArray(w * h)
+
+        original.getPixels(origPx, 0, w, 0, 0, w, h)
+        blurred.getPixels(blurPx, 0, w, 0, 0, w, h)
+
+        for (i in origPx.indices) {
+            val o = origPx[i]
+            val b = blurPx[i]
+
+            val rO = (o shr 16) and 0xFF
+            val gO = (o shr 8) and 0xFF
+            val bO = o and 0xFF
+
+            val rB = (b shr 16) and 0xFF
+            val gB = (b shr 8) and 0xFF
+            val bB = b and 0xFF
+
+            val r = (rO + (rO - rB) * amount).coerceIn(0f, 255f).toInt()
+            val g = (gO + (gO - gB) * amount).coerceIn(0f, 255f).toInt()
+            val bC = (bO + (bO - bB) * amount).coerceIn(0f, 255f).toInt()
+
+            outPx[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or bC
+        }
+
+        sharpedBitmap.setPixels(outPx, 0, w, 0, 0, w, h)
+
+        // Save the bitmap
+        val name = "SharpedImg.jpg"
+        cameraLib.saveBitmapToGallery(context, sharpedBitmap, name, Settings.photoPath)
+        return sharpedBitmap
+    }
+
+    // Private Methods
+
+    // ----------------------------------------------------------------------
+    // boxBlur
+    // ----------------------------------------------------------------------
+    fun boxBlur(bitmap: Bitmap): Bitmap {
+        val w = bitmap.width
+        val h = bitmap.height
+        val bmp = createBitmap(w, h)
+
+        val pixels = IntArray(w * h)
+        val result = IntArray(w * h)
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        for (y in 1 until h - 1) {
+            for (x in 1 until w - 1) {
+                var r = 0
+                var g = 0
+                var b = 0
+
+                for (dy in -1..1) {
+                    for (dx in -1..1) {
+                        val c = pixels[(y + dy) * w + (x + dx)]
+                        r += (c shr 16) and 0xFF
+                        g += (c shr 8) and 0xFF
+                        b += c and 0xFF
+                    }
+                }
+
+                r /= 9
+                g /= 9
+                b /= 9
+
+                result[y * w + x] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            }
+        }
+
+        bmp .setPixels(result, 0, w, 0, 0, w, h)
+        return bmp
     }
 
     // ----------------------------------------------------------------------
@@ -277,56 +418,6 @@ class Stacker {
             result[i] = temp[temp.size / 2].toFloat()
         }
         return result
-    }
-
-    // ----------------------------------------------------------------------
-    // laplacianVariance
-    // ----------------------------------------------------------------------
-    fun laplacianVariance(bitmap: Bitmap): Double {
-        val width = bitmap.width
-        val height = bitmap.height
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-
-        // Convert to luminance (Y)
-        val gray = DoubleArray(width * height)
-        for (i in pixels.indices) {
-            val p = pixels[i]
-            val r = (p shr 16) and 0xFF
-            val g = (p shr 8) and 0xFF
-            val b = p and 0xFF
-            gray[i] = 0.299*r + 0.587*g + 0.114*b
-        }
-
-        // Laplacian Kernel  3x3
-        val kernel = arrayOf(
-            intArrayOf(0,  1, 0),
-            intArrayOf(1, -4, 1),
-            intArrayOf(0,  1, 0)
-        )
-
-        val lap = DoubleArray(width * height)
-
-        for (y in 1 until height-1) {
-            for (x in 1 until width-1) {
-                var sum = 0.0
-                for (ky in -1..1) {
-                    for (kx in -1..1) {
-                        val px = x + kx
-                        val py = y + ky
-                        val weight = kernel[ky+1][kx+1]
-                        sum += gray[py * width + px] * weight
-                    }
-                }
-                lap[y * width + x] = sum
-            }
-        }
-
-        // Compute variance
-        val mean = lap.average()
-        var variance = 0.0
-        for (v in lap) variance += (v - mean) * (v - mean)
-        return variance / lap.size
     }
 }
 

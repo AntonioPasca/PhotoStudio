@@ -350,6 +350,19 @@ class SettingsActivity : ComponentActivity() {
             max = 75,
             description =  "Portion of area in alignment",
         )
+
+        // NumericUpDown - Portion of the image to use to compute the shift
+        var stackerSharpening by remember { mutableIntStateOf(Settings.stackerSharpening ) }
+        NumericUpDown(
+            value = stackerSharpening,
+            onValueChange = {
+                stackerSharpening = it
+                Settings.stackerSharpening = stackerSharpening
+            },
+            min = 25,
+            max = 45,
+            description =  "Sharpening value",
+        )
     }
 }
 
@@ -363,8 +376,7 @@ object Settings {
     var photoRawEnabled = true
     var photoBeepDelay = 5
     var photoNumMultiple = 3
-    var delayBetweenPhotos = 400L    // (in ms)
-    //var photoPath = "Pictures/CameraX"
+    var delayBetweenPhotos = 400L    // (in ms)S
     var photoPath = "Pictures/AstroPhoto"
 
     var videoStartBeepEnabled = true
@@ -376,4 +388,10 @@ object Settings {
     var stackerBeepEnabled = true
     var stackerMaxShift = 10
     var stackerAreaPercentage = 25
+
+    // Values
+    // 0.25 naturale
+    // 0.35 più incisivo (Luna)
+    // 0.45 pianeti con seeing buono
+    var stackerSharpening = 25
 }
