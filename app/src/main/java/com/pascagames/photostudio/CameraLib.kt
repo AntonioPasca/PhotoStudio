@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.7.0
+// Version:     Rel. 0.8.0
 //
 // Date:        June 2026
 //
@@ -158,7 +158,6 @@ class CameraLib {
 
             // Overlay Focus peaking
             if (focusPeakingBitmap != null) {
-                Log.v(TAG, "Focus active")
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { context ->
@@ -171,7 +170,7 @@ class CameraLib {
                 )
             }
 
-            // SLIDER ZOOM
+            // Slider Zoom
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)

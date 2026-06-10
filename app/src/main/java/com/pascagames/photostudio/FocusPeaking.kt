@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.7.0
+// Version:     Rel. 0.8.0
 //
 // Date:        June 2026
 //
@@ -25,7 +25,7 @@ import android.graphics.Color as AndroidColor
 // --------------------------------------------------------------------------
 object FocusPeakingProcessor {
 
-    fun process(image: ImageProxy): Bitmap? {
+    fun process(image: ImageProxy): Bitmap {
         val yBuffer = image.planes[0].buffer
         val width = image.width
         val height = image.height
@@ -68,7 +68,6 @@ object FocusPeakingProcessor {
                 out[x + y * width] = v.toByte()
             }
         }
-
         return out
     }
 

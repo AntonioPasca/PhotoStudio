@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.7.0
+// Version:     Rel. 0.8.0
 //
 // Date:        June 2026
 //
@@ -426,9 +426,9 @@ class Stacker {
 // ----------------------------------------------------------------------
 // Bitmap extension to create a rotation
 // ----------------------------------------------------------------------
-fun Bitmap.rotate(degrees: Float): Bitmap {
+/*fun Bitmap.rotate(degrees: Float): Bitmap {
 
     val matrix = Matrix().apply { postRotate(degrees) }
     val bmp = Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
     return bmp
-}
+}*/

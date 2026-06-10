@@ -7,9 +7,9 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.6.0
+// Version:     Rel. 0.8.0
 //
-// Date:        May 2026
+// Date:        June 2026
 //
 // Module:      InfoActivity.kt
 // --------------------------------------------------------------------------

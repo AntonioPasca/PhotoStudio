@@ -7,7 +7,7 @@
 //
 // Author:      Antonio Pascarella
 //
-// Version:     Rel. 0.7.0
+// Version:     Rel. 0.8.0
 //
 // Date:        June 2026
 //
@@ -61,7 +61,7 @@ import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.Size
+import kotlin.math.max
 
 // --------------------------------------------------------------------------
 // CLASS PhotoActivity
@@ -82,7 +82,6 @@ class PhotoActivity : ComponentActivity() {
 
         cameraLib = CameraLib()
         cameraExecutor = Executors.newSingleThreadExecutor()
-
         controller = LifecycleCameraController(this).apply {
             cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
             setEnabledUseCases(
@@ -175,12 +174,16 @@ class PhotoActivity : ComponentActivity() {
         }
 
         // Focus Peaking + Histogram Analyzer
-        LaunchedEffect(doFocus) {
+      /*  LaunchedEffect(doFocus) {
             if (doFocus) {
                 controller?.setImageAnalysisAnalyzer(
                     cameraExecutor,
                     CombinedAnalyzer(
-                        onFocusPeaking = { bmp -> focusPeakingBitmap.value = bmp },
+                        onFocusPeaking = { bmp ->
+                            if (doFocus) {
+                                focusPeakingBitmap.value = bmp
+                            }
+                        },
                         onHistogram = { hist -> histogram.value = hist }
                     )
                 )
@@ -188,6 +191,20 @@ class PhotoActivity : ComponentActivity() {
                 controller?.clearImageAnalysisAnalyzer()
                 focusPeakingBitmap.value = null
             }
+        }*/
+        LaunchedEffect(Unit) {
+            controller?.setImageAnalysisAnalyzer(
+                cameraExecutor,
+                CombinedAnalyzer(
+                    onFocusPeaking = { bmp ->
+                        if (doFocus) focusPeakingBitmap.value = bmp
+                        else focusPeakingBitmap.value = null
+                    },
+                    onHistogram = { hist ->
+                        histogram.value = hist
+                    }
+                )
+            )
         }
 
         // Single Photo
@@ -255,13 +272,21 @@ class PhotoActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     @Composable
     fun HistogramView(values: FloatArray) {
-        Canvas(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+        Canvas(modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp)
+        ) {
             val barWidth = size.width / 256f
+
             values.forEachIndexed { i, v ->
-                drawRect(
+                val x = i * barWidth
+                val y = size.height * (1f - v)
+
+                drawLine(
                     color = Color.Green,
-                    topLeft = Offset(i * barWidth, size.height * (1f - v)),
-                    size = Size(barWidth, size.height * v)
+                    start = Offset(x, size.height),
+                    end = Offset(x, y),
+                    strokeWidth = max(1f, barWidth)   // always visible
                 )
             }
         }

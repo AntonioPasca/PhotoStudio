@@ -18,6 +18,7 @@ package com.pascagames.photostudio
 import android.graphics.Bitmap
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
+import android.graphics.Matrix
 
 // --------------------------------------------------------------------------
 // CLASS CombinedAnalyzer
@@ -35,9 +36,12 @@ class CombinedAnalyzer(
 
             // --- Focus peaking
             val edges = FocusPeakingProcessor.process(image)
-            onFocusPeaking(edges)
+            val rotatedEdges = edges?.let {
+                rotateBitmap(it, image.imageInfo.rotationDegrees)
+            }
+            onFocusPeaking(rotatedEdges)
 
-            // --- HISTOGRAM ---
+            // --- Histogram ---
             val luma = extractLuma(image)
             val hist = computeHistogram(luma)
             val normalized = normalizeHistogram(hist)
@@ -64,6 +68,7 @@ class CombinedAnalyzer(
     // ----------------------------------------------------------------------
     private fun extractLuma(image: ImageProxy): ByteArray {
         val buffer = image.planes[0].buffer
+        buffer.rewind()
         val data = ByteArray(buffer.remaining())
         buffer.get(data)
         return data
@@ -75,5 +80,15 @@ class CombinedAnalyzer(
     private fun normalizeHistogram(hist: IntArray): FloatArray {
         val max = hist.maxOrNull()?.toFloat() ?: 1f
         return FloatArray(256) { i -> hist[i] / max }
+    }
+
+    // ----------------------------------------------------------------------
+    // rotateBitmap
+    // ----------------------------------------------------------------------
+    private fun rotateBitmap(src: Bitmap, degrees: Int): Bitmap {
+        if (degrees == 0) return src
+
+        val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+        return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
     }
 }
