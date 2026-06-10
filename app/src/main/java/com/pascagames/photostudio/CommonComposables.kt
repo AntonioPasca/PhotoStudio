@@ -13,7 +13,7 @@
 //
 // Module:      CommonComposables
 // --------------------------------------------------------------------
-//  UI Compose Componenents
+//  UI Compose Components
 //
 //      fun CustomToast(message: String, duration: Long = 1500L)
 //      fun NumericUpDown(value: Int, onValueChange: (Int) -> Unit,
@@ -47,12 +47,16 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
@@ -108,6 +112,56 @@ fun CustomToast(
                     text = message,
                     color = Color.White,
                     fontSize = 16.sp
+                )
+            }
+        }
+    }
+}
+
+// --------------------------------------------------------------------
+// DropdownSelector
+// --------------------------------------------------------------------
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun <T> DropdownSelector(
+    items: List<T>,
+    selectedItem: T?,
+    onItemSelected: (T) -> Unit,
+    itemLabel: (T) -> String,
+    modifier: Modifier = Modifier,
+    label: String = ""
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = modifier
+    ) {
+        TextField(
+            value = selectedItem?.let { itemLabel(it) } ?: "",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+            },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            items.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(itemLabel(item)) },
+                    onClick = {
+                        onItemSelected(item)
+                        expanded = false
+                    }
                 )
             }
         }

@@ -22,11 +22,12 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.camera.core.CameraSelector
+import androidx.camera.view.CameraController
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -42,25 +43,35 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.camera.view.LifecycleCameraController
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pascagames.photostudio.ui.theme.PhotoStudioTheme
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Size
 
 // --------------------------------------------------------------------------
-// PhotoActivity
+// CLASS PhotoActivity
 // --------------------------------------------------------------------------
 class PhotoActivity : ComponentActivity() {
 
     private var backToCaller: (Unit) -> Unit = { back() }
-    val cameraLib = CameraLib()
+    private lateinit var cameraLib: CameraLib
     private lateinit var cameraExecutor: ExecutorService
+    private var controller: LifecycleCameraController? = null
 
     // ----------------------------------------------------------------------
     // onCreate
@@ -69,22 +80,45 @@ class PhotoActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        cameraLib = CameraLib()
         cameraExecutor = Executors.newSingleThreadExecutor()
 
-       /* var title = "Photo (Jpg Format)"
-        if (Settings.photoRawEnabled)
-            title = "Photo (Raw Format)"*/
+        controller = LifecycleCameraController(this).apply {
+            cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            setEnabledUseCases(
+                CameraController.IMAGE_CAPTURE or
+                CameraController.VIDEO_CAPTURE or
+                CameraController.IMAGE_ANALYSIS
+            )
+        }
+    }
 
-        val title = "Photo"
+    // ----------------------------------------------------------------------
+    // onResume
+    // ----------------------------------------------------------------------
+    override fun onResume() {
+        super.onResume()
+
+        var title = "Photo (Jpg Format)"
+        if (Settings.photoRawEnabled)
+            title = "Photo (Raw Format)"
 
         val actions = listOf(
             TopBarAction.Settings { settings() },
         )
+
+        // Update camera
+        controller?.cameraSelector =
+            if (Settings.photoBackCamera)
+                CameraSelector.DEFAULT_BACK_CAMERA
+            else
+                CameraSelector.DEFAULT_FRONT_CAMERA
+
         setContent {
             PhotoStudioTheme {
                 Scaffold(topBar = { TopBarEx(title, actions, backToCaller) })  {
-                    innerPadding ->
-                        MainScreen(modifier = Modifier.padding(innerPadding))
+                        innerPadding ->
+                    MainScreen(modifier = Modifier.padding(innerPadding))
                 }
             }
         }
@@ -120,89 +154,114 @@ class PhotoActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     // MainScreen
     // ----------------------------------------------------------------------
-    @SuppressLint("UnrememberedMutableState")
     @Composable
-    fun MainScreen(modifier: Modifier = Modifier) {
-
-        val context = LocalContext.current
+    fun MainScreen(
+        modifier: Modifier = Modifier,
+    ) {
         val lifecycleOwner = LocalLifecycleOwner.current
 
-        // CameraX controller
-        val controller = cameraLib.rememberCameraController(context)
-
         // UI States
-        var doFocus by remember {mutableStateOf(false)}
-        var doSinglePhoto by remember {mutableStateOf(false)}
-        var doMultiplePhotos by remember {mutableStateOf(false)}
+        var doFocus by remember { mutableStateOf(false) }
+        var doSinglePhoto by remember { mutableStateOf(false) }
+        var doMultiplePhotos by remember { mutableStateOf(false) }
 
-        // Bitmap for overlay focus peaking
-        val focusPeakingBitmap = mutableStateOf<Bitmap?>(null)
+        // Overlay states
+        val focusPeakingBitmap = remember { mutableStateOf<Bitmap?>(null) }
+        val histogram = remember { mutableStateOf(FloatArray(256)) }
 
         // Bind controller to lifecycle
         LaunchedEffect(Unit) {
-            controller.bindToLifecycle(lifecycleOwner)
+            controller?.bindToLifecycle(lifecycleOwner)
         }
 
-        // Focus Peaking management
+        // Focus Peaking + Histogram Analyzer
         LaunchedEffect(doFocus) {
             if (doFocus) {
-                Log.v(TAG, "Focus peaking ON")
-                controller.setImageAnalysisAnalyzer(
+                controller?.setImageAnalysisAnalyzer(
                     cameraExecutor,
-                    FocusPeakingAnalyzer { edges ->
-                        focusPeakingBitmap.value = edges
-                    }
+                    CombinedAnalyzer(
+                        onFocusPeaking = { bmp -> focusPeakingBitmap.value = bmp },
+                        onHistogram = { hist -> histogram.value = hist }
+                    )
                 )
             } else {
-                Log.v(TAG, "Focus peaking OFF")
-                controller.clearImageAnalysisAnalyzer()
+                controller?.clearImageAnalysisAnalyzer()
                 focusPeakingBitmap.value = null
             }
         }
 
         // Single Photo
         if (doSinglePhoto) {
-            val newFolder =  createSessionDirectory()
+            val newFolder = createSessionDirectory()
             TakeSinglePhoto(
-                controller = controller,
+                controller = controller!!,
                 newFolder,
-                onFinished = {doSinglePhoto = false})
+                onFinished = { doSinglePhoto = false }
+            )
         }
 
-        // MultiplePhotos
+        // Multiple Photos
         if (doMultiplePhotos) {
             TakeMultiplePhotos(
-                controller = controller,
+                controller = controller!!,
                 onFinishedSingle = {},
                 onEnd = {
                     doMultiplePhotos = false
                     if (Settings.photoBeepEnabled)
                         beep(100, 50)
-                })
-        }
-
-        LaunchedEffect(Unit) {
-            controller.bindToLifecycle(lifecycleOwner)
+                }
+            )
         }
 
         Scaffold(
             bottomBar = {
                 BottomBar(
-                    {doFocus = !doFocus},
-                    {doSinglePhoto = true},
-                    onMultiplePhotos = {doMultiplePhotos = true}
-               )
+                    { doFocus = !doFocus },
+                    { doSinglePhoto = true },
+                    onMultiplePhotos = { doMultiplePhotos = true }
+                )
             }
         ) { innerPadding ->
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
+
+                // Camera preview
                 cameraLib.CameraPreview(
-                    controller = controller,
+                    controller = controller!!,
                     modifier = Modifier.fillMaxSize(),
                     focusPeakingBitmap = focusPeakingBitmap.value
+                )
+
+                // Histogram overlay
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .size(width = 160.dp, height = 100.dp)
+                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                ) {
+                    HistogramView(histogram.value)
+                }
+            }
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // HistogramView
+    // ----------------------------------------------------------------------
+    @Composable
+    fun HistogramView(values: FloatArray) {
+        Canvas(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+            val barWidth = size.width / 256f
+            values.forEachIndexed { i, v ->
+                drawRect(
+                    color = Color.Green,
+                    topLeft = Offset(i * barWidth, size.height * (1f - v)),
+                    size = Size(barWidth, size.height * v)
                 )
             }
         }

@@ -1,3 +1,5 @@
+import java.lang.module.ModuleFinder.compose
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -50,6 +52,7 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.compose.ui.geometry)
     val camerax = "1.6.1"
 
     implementation(libs.androidx.core.ktx)

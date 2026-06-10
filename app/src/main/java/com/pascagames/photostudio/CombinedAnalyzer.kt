@@ -1,0 +1,79 @@
+// --------------------------------------------------------------------------
+// Language:    Kotlin
+//
+// Framework:   Google Jetpack Compose
+//
+// Package:     com.pascagames.photostudio
+//
+// Author:      Antonio Pascarella
+//
+// Version:     Rel. 0.7.0
+//
+// Date:        June 2026
+//
+// Module:      CombinedAnalyzer
+// --------------------------------------------------------------------------
+package com.pascagames.photostudio
+
+import android.graphics.Bitmap
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+
+// --------------------------------------------------------------------------
+// CLASS CombinedAnalyzer
+// --------------------------------------------------------------------------
+class CombinedAnalyzer(
+    private val onFocusPeaking: (Bitmap?) -> Unit,
+    private val onHistogram: (FloatArray) -> Unit
+) : ImageAnalysis.Analyzer {
+
+    // ----------------------------------------------------------------------
+    // analyze
+    // ----------------------------------------------------------------------
+    override fun analyze(image: ImageProxy) {
+        try {
+
+            // --- Focus peaking
+            val edges = FocusPeakingProcessor.process(image)
+            onFocusPeaking(edges)
+
+            // --- HISTOGRAM ---
+            val luma = extractLuma(image)
+            val hist = computeHistogram(luma)
+            val normalized = normalizeHistogram(hist)
+            onHistogram(normalized)
+
+        } finally {
+            image.close()
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // computeHistogram
+    // ----------------------------------------------------------------------
+    private fun computeHistogram(luma: ByteArray): IntArray {
+        val hist = IntArray(256)
+        for (v in luma) {
+            hist[v.toInt() and 0xFF]++
+        }
+        return hist
+    }
+
+    // ----------------------------------------------------------------------
+    // extractLuma
+    // ----------------------------------------------------------------------
+    private fun extractLuma(image: ImageProxy): ByteArray {
+        val buffer = image.planes[0].buffer
+        val data = ByteArray(buffer.remaining())
+        buffer.get(data)
+        return data
+    }
+
+    // ----------------------------------------------------------------------
+    // normalizeHistogram
+    // ----------------------------------------------------------------------
+    private fun normalizeHistogram(hist: IntArray): FloatArray {
+        val max = hist.maxOrNull()?.toFloat() ?: 1f
+        return FloatArray(256) { i -> hist[i] / max }
+    }
+}

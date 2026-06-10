@@ -17,6 +17,7 @@ package com.pascagames.photostudio
 
 import android.os.Bundle
 import android.os.Environment
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -32,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -101,8 +103,15 @@ class SettingsActivity : ComponentActivity() {
 
         var rawCanBeEnabled = false
         if (cameraLib.isRawSupported(LocalContext.current, "0"))
-            //rawCanBeEnabled = Settings.photoRawEnabled
             rawCanBeEnabled = true
+
+        var cameras by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+        val context = LocalContext.current
+
+        LaunchedEffect(Unit) {
+            cameras = cameraLib.listAvailableCameras(context)
+            Log.v(TAG, cameras.toString())
+        }
 
         Column(
             modifier = Modifier
@@ -137,6 +146,18 @@ class SettingsActivity : ComponentActivity() {
 
         // Photo Settings
         // ------------------------------------------------------
+
+        // Switch - Back or Front Camera
+        var photoBackCamera by remember { mutableStateOf(Settings.photoBackCamera) }
+        SettingSwitch(
+            label = "Back camera",
+            description = "(Use back camera)",
+            value = photoBackCamera,
+            onValueChange = {
+                photoBackCamera = !photoBackCamera
+                Settings.photoBackCamera = photoBackCamera
+            }
+        )
 
         // Switch - Beep after a photo has been taken
         var photoBeepEnabled by remember { mutableStateOf(Settings.photoBeepEnabled) }
@@ -219,7 +240,7 @@ class SettingsActivity : ComponentActivity() {
             },
             min = 100,
             max = 5000,
-            description =  "Delay between succ. photos"
+            description =  "Delay between photos"
         )
 
         // Location to save photos
@@ -371,12 +392,13 @@ class SettingsActivity : ComponentActivity() {
 // --------------------------------------------------------------------------
 object Settings {
 
+    var photoBackCamera = true
     var photoBeepEnabled = true
     var photoDelayBeepEnabled = false
     var photoRawEnabled = true
     var photoBeepDelay = 5
     var photoNumMultiple = 3
-    var delayBetweenPhotos = 400L    // (in ms)S
+    var delayBetweenPhotos = 400L    // (in ms)
     var photoPath = "Pictures/AstroPhoto"
 
     var videoStartBeepEnabled = true
@@ -390,8 +412,8 @@ object Settings {
     var stackerAreaPercentage = 25
 
     // Values
-    // 0.25 naturale
-    // 0.35 più incisivo (Luna)
-    // 0.45 pianeti con seeing buono
+    // 0.25 natural
+    // 0.35 more aggressive (Moon)
+    // 0.45 planets with good seeing
     var stackerSharpening = 25
 }

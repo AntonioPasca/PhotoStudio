@@ -20,6 +20,8 @@
 //      fun floatArrayToBitmap(buffer: FloatArray, width: Int, height: Int): Bitmap
 //      fun getAudioPermission(): Boolean
 //      fun getCameraPermission(): Boolean
+//      fun isRawSupported(context: Context, cameraId: String): Boolean
+//      suspend fun listAvailableCameras(context: Context): List<Pair<String, String>>
 //      fun takePhoto(context: Context, controller: LifecycleCameraController)
 //      fun rememberCameraController(context: Context): LifecycleCameraController
 //      fun saveBitmapToGallery()
@@ -77,6 +79,12 @@ import androidx.core.graphics.set
 import androidx.core.graphics.createBitmap
 import android.hardware.camera2.CameraManager
 import android.util.Log
+import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.lifecycle.ProcessCameraProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 const val PHOTO_JPEG = 0
@@ -125,6 +133,15 @@ class CameraLib {
         focusPeakingBitmap: Bitmap? // <- to the analyzer
     ) {
         val zoomState: ZoomState? by controller.zoomState.observeAsState()
+        val context = LocalContext.current
+        
+        // PreviewView stabile
+        val previewView = remember {
+            PreviewView(context).apply {
+                this.controller = controller
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+            }
+        }
 
         Box(modifier = Modifier.fillMaxSize()) {
 
@@ -306,6 +323,35 @@ class CameraLib {
     }
 
     // ----------------------------------------------------------------------
+    // listAvailableCameras
+    // ----------------------------------------------------------------------
+    @OptIn(ExperimentalCamera2Interop::class)
+    suspend fun listAvailableCameras(context: Context): List<Pair<String, String>> {
+        val provider = withContext(Dispatchers.IO) {
+            ProcessCameraProvider.getInstance(context).get()
+        }
+        val cameraInfos = provider.availableCameraInfos
+
+        return cameraInfos.map { cameraInfo ->
+            val camera2Info = Camera2CameraInfo.from(cameraInfo)
+            val id = camera2Info.cameraId
+
+            val facing = camera2Info.getCameraCharacteristic(
+                CameraCharacteristics.LENS_FACING
+            )
+
+            val facingName = when (facing) {
+                CameraCharacteristics.LENS_FACING_BACK -> "Back"
+                CameraCharacteristics.LENS_FACING_FRONT -> "Front"
+                CameraCharacteristics.LENS_FACING_EXTERNAL -> "External"
+                else -> "Unknown"
+            }
+
+            id to facingName
+        }
+    }
+
+    // ----------------------------------------------------------------------
     // rememberCameraController
     // ----------------------------------------------------------------------
     @Composable
@@ -313,10 +359,14 @@ class CameraLib {
         val controller = remember {
             LifecycleCameraController(context).apply {
                 cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                Log.v(TAG, "rCC")
+                Log.v(TAG, cameraSelector.toString())
+                if (!Settings.photoBackCamera)
+                    cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
                 setEnabledUseCases(
                     CameraController.IMAGE_CAPTURE or
-                    CameraController.VIDEO_CAPTURE or
-                    CameraController.IMAGE_ANALYSIS
+                            CameraController.VIDEO_CAPTURE or
+                            CameraController.IMAGE_ANALYSIS
                 )
             }
         }
@@ -343,7 +393,6 @@ class CameraLib {
         onSaved: () -> Unit,
         onError: () -> Unit
     ) {
-        //val name = "IMG_${System.currentTimeMillis()}.jpg"
         var mimeType = "image/jpeg"
         if (photoType == PHOTO_RAW)
             mimeType = "image/x-adobe-dng"
