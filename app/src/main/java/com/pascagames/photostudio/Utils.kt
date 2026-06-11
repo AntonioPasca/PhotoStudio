@@ -14,6 +14,8 @@
 // Module:      Utils.kt
 // --------------------------------------------------------------------------
 // Utils functions
+//      fun beep(volume: Int, duration: Int)
+//      fun createSessionDirectory(): File
 //      fun formatTime(seconds: Int): String
 // --------------------------------------------------------------------------
 package com.pascagames.photostudio
@@ -60,7 +62,6 @@ fun createSessionDirectory(): File {
 
     val relativePath = File(Settings.photoPath, sessionName)
 
-    //return sessionDir
     return relativePath
 }
 

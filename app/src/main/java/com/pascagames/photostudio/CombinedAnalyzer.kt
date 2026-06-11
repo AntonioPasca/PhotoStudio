@@ -32,13 +32,10 @@ class CombinedAnalyzer(
     // analyze
     // ----------------------------------------------------------------------
     override fun analyze(image: ImageProxy) {
-        try {
-
+        image.use { image ->
             // --- Focus peaking
             val edges = FocusPeakingProcessor.process(image)
-            val rotatedEdges = edges?.let {
-                rotateBitmap(it, image.imageInfo.rotationDegrees)
-            }
+            val rotatedEdges = rotateBitmap(edges, image.imageInfo.rotationDegrees)
             onFocusPeaking(rotatedEdges)
 
             // --- Histogram ---
@@ -46,9 +43,6 @@ class CombinedAnalyzer(
             val hist = computeHistogram(luma)
             val normalized = normalizeHistogram(hist)
             onHistogram(normalized)
-
-        } finally {
-            image.close()
         }
     }
 

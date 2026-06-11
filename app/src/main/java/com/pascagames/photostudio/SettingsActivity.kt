@@ -204,6 +204,18 @@ class SettingsActivity : ComponentActivity() {
             }
         )
 
+        // Switch - Show histogram
+        var photoShowHistogram by remember { mutableStateOf(Settings.photoShowHistogram) }
+        SettingSwitch(
+            label = "Histogram",
+            description = "(Show or hide histogram)",
+            value = photoShowHistogram,
+            onValueChange = {
+                photoShowHistogram = !photoShowHistogram
+                Settings.photoShowHistogram = photoShowHistogram
+            }
+        )
+
         // Numeric Up-Down - Delay in seconds
         var photoBeepDelay by remember { mutableIntStateOf(Settings.photoBeepDelay) }
         NumericUpDown(
@@ -396,6 +408,7 @@ object Settings {
     var photoBeepEnabled = true
     var photoDelayBeepEnabled = false
     var photoRawEnabled = true
+    var photoShowHistogram = true
     var photoBeepDelay = 5
     var photoNumMultiple = 3
     var delayBetweenPhotos = 400L    // (in ms)

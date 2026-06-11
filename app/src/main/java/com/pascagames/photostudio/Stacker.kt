@@ -17,7 +17,6 @@ package com.pascagames.photostudio
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.os.Environment
 import android.util.Log
 import java.io.File
@@ -46,9 +45,9 @@ class Stacker {
     // executeStacking
     // ----------------------------------------------------------------------
     // Todo
-    //      più veloce (con buffer preallocati)
-    //      più preciso (stacking a colori, non solo grayscale)
-    //      più “astro” (sigma‑clipping, dark frame, flat field)
+    //      faster (with pre-allocated buffers)
+    //      more accurate (color stacking, not only grayscale)
+    //      more “astro” (sigma‑clipping, dark frame, flat field)
     // ----------------------------------------------------------------------
     fun executeStacking(
         context: Context,

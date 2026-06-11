@@ -173,25 +173,7 @@ class PhotoActivity : ComponentActivity() {
             controller?.bindToLifecycle(lifecycleOwner)
         }
 
-        // Focus Peaking + Histogram Analyzer
-      /*  LaunchedEffect(doFocus) {
-            if (doFocus) {
-                controller?.setImageAnalysisAnalyzer(
-                    cameraExecutor,
-                    CombinedAnalyzer(
-                        onFocusPeaking = { bmp ->
-                            if (doFocus) {
-                                focusPeakingBitmap.value = bmp
-                            }
-                        },
-                        onHistogram = { hist -> histogram.value = hist }
-                    )
-                )
-            } else {
-                controller?.clearImageAnalysisAnalyzer()
-                focusPeakingBitmap.value = null
-            }
-        }*/
+        // Combined Analyzer (Focus + Histogram)
         LaunchedEffect(Unit) {
             controller?.setImageAnalysisAnalyzer(
                 cameraExecutor,
@@ -254,14 +236,16 @@ class PhotoActivity : ComponentActivity() {
                 )
 
                 // Histogram overlay
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .size(width = 160.dp, height = 100.dp)
-                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                ) {
-                    HistogramView(histogram.value)
+                if (Settings.photoShowHistogram) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 60.dp)
+                            .size(width = 160.dp, height = 120.dp)
+                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                    ) {
+                        HistogramView(histogram.value)
+                    }
                 }
             }
         }
@@ -274,14 +258,12 @@ class PhotoActivity : ComponentActivity() {
     fun HistogramView(values: FloatArray) {
         Canvas(modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(180.dp)
         ) {
             val barWidth = size.width / 256f
-
             values.forEachIndexed { i, v ->
                 val x = i * barWidth
                 val y = size.height * (1f - v)
-
                 drawLine(
                     color = Color.Green,
                     start = Offset(x, size.height),

@@ -279,8 +279,6 @@ fun ShowMessage(text: String, fontSize: TextUnit) {
 @Composable
 fun TopBar(title: String, callback: (Unit) -> Unit) {
 
-    var menuExpanded by remember { mutableStateOf(true) }
-
     CenterAlignedTopAppBar(
         title = {
             Text(
