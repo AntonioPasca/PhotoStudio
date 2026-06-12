@@ -52,6 +52,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -136,13 +137,18 @@ fun <T> DropdownSelector(
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded },
-        modifier = modifier
+        modifier = modifier.background(Color.Black)
     ) {
         TextField(
             value = selectedItem?.let { itemLabel(it) } ?: "",
             onValueChange = {},
             readOnly = true,
-            label = { Text(label) },
+            label = { Text(
+                        label,
+                        color = Color.White,
+                        fontSize = 16.sp)
+                    },
+            textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
             trailingIcon = {
                 ExposedDropdownMenuDefaults.TrailingIcon(expanded)
             },
@@ -150,14 +156,16 @@ fun <T> DropdownSelector(
                 .menuAnchor()
                 .fillMaxWidth()
         )
-
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
             items.forEach { item ->
                 DropdownMenuItem(
-                    text = { Text(itemLabel(item)) },
+                    text = { Text(
+                                itemLabel(item),
+                                modifier.padding(start = 20.dp))
+                           },
                     onClick = {
                         onItemSelected(item)
                         expanded = false

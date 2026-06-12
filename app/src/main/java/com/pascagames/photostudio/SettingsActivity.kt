@@ -385,7 +385,7 @@ class SettingsActivity : ComponentActivity() {
         )
 
         // NumericUpDown - Portion of the image to use to compute the shift
-        var stackerSharpening by remember { mutableIntStateOf(Settings.stackerSharpening ) }
+        /*var stackerSharpening by remember { mutableIntStateOf(Settings.stackerSharpening ) }
         NumericUpDown(
             value = stackerSharpening,
             onValueChange = {
@@ -395,9 +395,28 @@ class SettingsActivity : ComponentActivity() {
             min = 25,
             max = 45,
             description =  "Sharpening value",
+        )*/
+        val sharpValues = listOf(
+            SharpInfo(25, "Natural"),
+            SharpInfo(35, "Moon"),
+            SharpInfo(45, "Planets")
+        )
+        var stackerSharpening by remember { mutableStateOf(Settings.stackerSharpening ) }
+        DropdownSelector(
+            sharpValues,
+            stackerSharpening,
+            onItemSelected = {stackerSharpening = it },
+            itemLabel = { stSh -> stSh.value.toString() + "     -     " + stSh.desc},
+            modifier = Modifier,
+            label = "Sharpening value"
         )
     }
 }
+
+data class SharpInfo (
+    val value: Int,
+    val desc: String
+)
 
 // --------------------------------------------------------------------------
 // OBJECT SettingsActivity
@@ -428,5 +447,6 @@ object Settings {
     // 0.25 natural
     // 0.35 more aggressive (Moon)
     // 0.45 planets with good seeing
-    var stackerSharpening = 25
+    //var stackerSharpening = 25
+    var stackerSharpening = SharpInfo(25, "Natural")
 }

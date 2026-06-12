@@ -126,7 +126,7 @@ class StackerActivity : ComponentActivity() {
             val (result, stackedBitmap) = stacker.executeStacking(context, onImageShifting, onImagesShifting)
             if (result) {
                 Toast.makeText(context, "Sharpening", Toast.LENGTH_SHORT).show()
-                val sharpened = stacker.unsharpMask(context,stackedBitmap!!, Settings.stackerSharpening.toFloat())
+                val sharpened = stacker.unsharpMask(context,stackedBitmap!!, Settings.stackerSharpening.value.toFloat())
             }
             else {
                 beep(100, 20)

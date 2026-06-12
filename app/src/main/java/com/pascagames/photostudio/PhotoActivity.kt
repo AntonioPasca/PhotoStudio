@@ -160,9 +160,10 @@ class PhotoActivity : ComponentActivity() {
         val lifecycleOwner = LocalLifecycleOwner.current
 
         // UI States
-        var doFocus by remember { mutableStateOf(false) }
         var doSinglePhoto by remember { mutableStateOf(false) }
         var doMultiplePhotos by remember { mutableStateOf(false) }
+        var doDarks by remember { mutableStateOf(false) }
+        var doFocus by remember { mutableStateOf(false) }
 
         // Overlay states
         val focusPeakingBitmap = remember { mutableStateOf<Bitmap?>(null) }
@@ -212,12 +213,26 @@ class PhotoActivity : ComponentActivity() {
             )
         }
 
+        // Take multiple dark photo
+        if (doDarks) {
+            TakeMultiplePhotos(
+                controller = controller!!,
+                onFinishedSingle = {},
+                onEnd = {
+                    doDarks = false
+                    if (Settings.photoBeepEnabled)
+                        beep(100, 50)
+                }
+            )
+        }
+
         Scaffold(
             bottomBar = {
                 BottomBar(
-                    { doFocus = !doFocus },
                     { doSinglePhoto = true },
-                    onMultiplePhotos = { doMultiplePhotos = true }
+                    onMultiplePhotos = { doMultiplePhotos = true },
+                    onDark = {doDarks = true},
+                    { doFocus = !doFocus },
                 )
             }
         ) { innerPadding ->
@@ -427,29 +442,13 @@ class PhotoActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     @Composable
     fun BottomBar(
-        onFocus: () -> Unit,
+
         onPhoto: () -> Unit,
-        onMultiplePhotos: () -> Unit){
+        onMultiplePhotos: () -> Unit,
+        onDark: () -> Unit,
+        onFocus: () -> Unit,){
 
         NavigationBar {
-            NavigationBarItem(
-                selected = true,
-                onClick = onFocus,
-                icon = {
-                    Icon(
-                        painterResource(id = R.drawable.focus),
-                        contentDescription = null
-                    )
-                },
-                label = { Text("Focus peaking") },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.Green,
-                    unselectedIconColor = Color.White,
-                    selectedTextColor = Color.White,
-                    unselectedTextColor = Color.Gray,
-                    indicatorColor = Color.Transparent
-                )
-            )
 
             NavigationBarItem(
                 selected = true,
@@ -480,6 +479,44 @@ class PhotoActivity : ComponentActivity() {
                     )
                 },
                 label = { Text("Multiple Photos") },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.Green,
+                    unselectedIconColor = Color.White,
+                    selectedTextColor = Color.White,
+                    unselectedTextColor = Color.Gray,
+                    indicatorColor = Color.Transparent
+                )
+            )
+
+            NavigationBarItem(
+                selected = true,
+                onClick = onDark,
+                icon = {
+                    Icon(
+                        painterResource(id = R.drawable.dark),
+                        contentDescription = null
+                    )
+                },
+                label = { Text("Dark") },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.Green,
+                    unselectedIconColor = Color.White,
+                    selectedTextColor = Color.White,
+                    unselectedTextColor = Color.Gray,
+                    indicatorColor = Color.Transparent
+                )
+            )
+
+            NavigationBarItem(
+                selected = true,
+                onClick = onFocus,
+                icon = {
+                    Icon(
+                        painterResource(id = R.drawable.focus),
+                        contentDescription = null
+                    )
+                },
+                label = { Text("Focus peaking") },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.Green,
                     unselectedIconColor = Color.White,
