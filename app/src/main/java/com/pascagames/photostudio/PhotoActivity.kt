@@ -21,12 +21,19 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
+import android.hardware.camera2.CameraMetadata.NOISE_REDUCTION_MODE_OFF
+import android.hardware.camera2.CaptureRequest
 import android.os.Bundle
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.OptIn
+import androidx.camera.camera2.impl.StillCaptureRequestControl
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
 import androidx.camera.view.CameraController
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -76,12 +83,20 @@ class PhotoActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     // onCreate
     // ----------------------------------------------------------------------
+    @OptIn(ExperimentalCamera2Interop::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         cameraLib = CameraLib()
         cameraExecutor = Executors.newSingleThreadExecutor()
+
+        ////                NOTA                            ///
+        // 1.   SPOSTARE QUESTA PARTE In CameraLib
+        //      da utilizzare anche in VideoActivity
+        //      startCamera() -> controller
+        //
+        // 2- Update cameraSelector portare anceh in cameraLib
         controller = LifecycleCameraController(this).apply {
             cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
             setEnabledUseCases(
@@ -90,6 +105,20 @@ class PhotoActivity : ComponentActivity() {
                 CameraController.IMAGE_ANALYSIS
             )
         }
+
+        // QUI dentro aggiungi Camera2Interop
+        // Non sembrano avere effetto
+        /*val imageCaptureBuilder = ImageCapture.Builder()
+        val extender = Camera2Interop.Extender(imageCaptureBuilder)
+
+        // ISO
+        extender.setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, 1600)
+
+        // Exposure time 1/10 sec = 100.000.000 ns
+        extender.setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, 100_000_000L)
+
+        // Noise Reduction OFF (Really important for Astro)
+        extender.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, NOISE_REDUCTION_MODE_OFF)*/
     }
 
     // ----------------------------------------------------------------------
@@ -204,6 +233,7 @@ class PhotoActivity : ComponentActivity() {
         if (doMultiplePhotos) {
             TakeMultiplePhotos(
                 controller = controller!!,
+                "PHOTO",
                 onFinishedSingle = {},
                 onEnd = {
                     doMultiplePhotos = false
@@ -217,6 +247,7 @@ class PhotoActivity : ComponentActivity() {
         if (doDarks) {
             TakeMultiplePhotos(
                 controller = controller!!,
+                "DARK",
                 onFinishedSingle = {},
                 onEnd = {
                     doDarks = false
@@ -322,26 +353,17 @@ class PhotoActivity : ComponentActivity() {
             }
 
             // Take RAW or JPG photo
-            if (Settings.photoRawEnabled) {
-                cameraLib.takePhoto(
+            val photoType = if (Settings.photoRawEnabled)  PHOTO_RAW else PHOTO_JPEG
+            val msgPrefix = if (Settings.photoRawEnabled) "RAW" else "JPEG"
+            cameraLib.takePhoto(
                     context,
                     controller,
-                    PHOTO_RAW,
+                    photoType,
                     folder,
                     1,
-                    onSaved = { message = "RAW saved" },
-                    onError = { message = "RAW error" })
-            }
-                else {
-                cameraLib.takePhoto(
-                    context,
-                    controller,
-                    PHOTO_JPEG,
-                    folder,
-                    1,
-                    onSaved = { message = "JPEG saved" },
-                    onError = { message = "JPEG error" })
-            }
+                    "PHOTO",
+                    onSaved = { message = "$msgPrefix saved" },
+                    onError = { message = "$msgPrefix error" })
 
             delay(1000)
             showCountDown = false
@@ -365,6 +387,7 @@ class PhotoActivity : ComponentActivity() {
     @Composable
     fun TakeMultiplePhotos(
         controller: LifecycleCameraController,
+        photoPrefix: String,
         onFinishedSingle: () -> Unit,
         onEnd: () -> Unit
     ) {
@@ -401,27 +424,19 @@ class PhotoActivity : ComponentActivity() {
 
             // Multiple photo loop
             for (showShotIdx in 0 until Settings.photoNumMultiple) {
-                if (Settings.photoRawEnabled) {
-                    cameraLib.takePhoto(
-                        context,
-                        controller,
-                        PHOTO_RAW,
-                        newFolder,
-                        showShotIdx+1,
-                        onSaved = { message = "RAW shot " + (showShotIdx +1).toString()},
-                        onError = { message = "RAW error on shot " + (showShotIdx +1).toString()})
-                }
-                else {
-                    cameraLib.takePhoto(
-                        context,
-                        controller,
-                        PHOTO_JPEG,
-                        newFolder,
-                        showShotIdx+1,
-                        onSaved = { message = "JPG shot " + (showShotIdx +1).toString() },
-                        onError = { message = "JPG error on shot " + (showShotIdx +1).toString()})
-                        onFinishedSingle()
-                }
+
+                val photoType = if (Settings.photoRawEnabled)  PHOTO_RAW else PHOTO_JPEG
+                val msgPrefix = if (Settings.photoRawEnabled) "RAW" else "JPEG"
+
+                cameraLib.takePhoto(
+                    context,
+                    controller,
+                    photoType,
+                    newFolder,
+                    showShotIdx+1,
+                    photoPrefix = photoPrefix,
+                    onSaved = { message = msgPrefix + " shot " + (showShotIdx +1).toString()},
+                    onError = { message = msgPrefix + " error on shot " + (showShotIdx +1).toString()})
 
                 delay(Settings.delayBetweenPhotos)
             }
@@ -446,7 +461,8 @@ class PhotoActivity : ComponentActivity() {
         onPhoto: () -> Unit,
         onMultiplePhotos: () -> Unit,
         onDark: () -> Unit,
-        onFocus: () -> Unit,){
+        onFocus: () -> Unit,
+    ){
 
         NavigationBar {
 

@@ -389,6 +389,7 @@ class CameraLib {
         photoType: Int,
         folder: File,
         photoIdx: Int,
+        photoPrefix: String,
         onSaved: () -> Unit,
         onError: () -> Unit
     ) {
@@ -396,7 +397,7 @@ class CameraLib {
         if (photoType == PHOTO_RAW)
             mimeType = "image/x-adobe-dng"
 
-        val name = "Photo_$photoIdx"
+        val name = photoPrefix + "_$photoIdx"
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, mimeType)

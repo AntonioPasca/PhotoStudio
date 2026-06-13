@@ -71,7 +71,6 @@ class Stacker {
         val finalBitmap = cameraLib.floatArrayToBitmap(resultArray, width, height)
 
         // Save
-        //val name = "Stacked_${System.currentTimeMillis()}.jpg"
         val name = "StackedImg.jpg"
         cameraLib.saveBitmapToGallery(context, finalBitmap, name, Settings.photoPath)
         return Pair(true, finalBitmap)
@@ -86,9 +85,6 @@ class Stacker {
 
         // Get all the pictures - Return if less than two
         val files = getPictures()
-
-        Log.v(TAG, "Images?")
-        Log.v(TAG, files.count().toString())
 
         buffers.clear()
 
@@ -114,10 +110,6 @@ class Stacker {
                 System.gc()
             }
         }
-
-        Log.v(TAG, "BUFFER")
-        Log.v(TAG, buffers.size.toString())
-        Log.v(TAG, buffers[0].size.toString())
 
         // Compute shifts
         val shifts = computeShifts(buffers = buffers, w = width, h = height,
@@ -334,11 +326,6 @@ class Stacker {
         val areaPercentage = Settings.stackerAreaPercentage.toDouble()
         val starRatio = sqrt(areaPercentage) /20
         val endRatio = starRatio *3
-
-        Log.v(TAG,"RATIO")
-        Log.v(TAG, starRatio.toString())
-        Log.v(TAG, endRatio.toString())
-        Log.v(TAG, maxShift.toString())
 
         val startX = w / 4
         val endX = w * 3 / 4

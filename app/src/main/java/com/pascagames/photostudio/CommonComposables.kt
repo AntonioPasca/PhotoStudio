@@ -16,6 +16,11 @@
 //  UI Compose Components
 //
 //      fun CustomToast(message: String, duration: Long = 1500L)
+//      fun <T> DropdownSelector(items: List<T>, selectedItem: T?,
+//                               onItemSelected: (T) -> Unit,
+//                               itemLabel: (T) -> String,
+//                               modifier: Modifier = Modifier,
+//                               label: String = "")
 //      fun NumericUpDown(value: Int, onValueChange: (Int) -> Unit,
 //                      min: Int,  max: Int)
 //      fun SettingSwitch(label: String, value: Boolean, onValueChange: (Boolean) -> Unit,

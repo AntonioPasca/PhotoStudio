@@ -34,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
 import android.content.Intent
 import android.graphics.Bitmap
 import android.widget.Toast
@@ -105,7 +104,6 @@ class VideoActivity : ComponentActivity() {
     // ----------------------------------------------------------------------
     // MainScreen
     // ----------------------------------------------------------------------
-    //@RequiresPermission(Manifest.permission.RECORD_AUDIO)
     @SuppressLint("UnrememberedMutableState")
     @Composable
     fun MainScreen(modifier: Modifier = Modifier) {
