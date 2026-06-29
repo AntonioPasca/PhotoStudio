@@ -384,18 +384,7 @@ class SettingsActivity : ComponentActivity() {
             description =  "Portion of area in alignment",
         )
 
-        // NumericUpDown - Portion of the image to use to compute the shift
-        /*var stackerSharpening by remember { mutableIntStateOf(Settings.stackerSharpening ) }
-        NumericUpDown(
-            value = stackerSharpening,
-            onValueChange = {
-                stackerSharpening = it
-                Settings.stackerSharpening = stackerSharpening
-            },
-            min = 25,
-            max = 45,
-            description =  "Sharpening value",
-        )*/
+        // Dropdown selector
         val sharpValues = listOf(
             SharpInfo(25, "Natural"),
             SharpInfo(35, "Moon"),
@@ -405,7 +394,9 @@ class SettingsActivity : ComponentActivity() {
         DropdownSelector(
             sharpValues,
             stackerSharpening,
-            onItemSelected = {stackerSharpening = it },
+            onItemSelected = {stackerSharpening = it
+                             Settings.stackerSharpening = stackerSharpening
+                             },
             itemLabel = { stSh -> stSh.value.toString() + "     -     " + stSh.desc},
             modifier = Modifier,
             label = "Sharpening value"
@@ -413,6 +404,9 @@ class SettingsActivity : ComponentActivity() {
     }
 }
 
+// --------------------------------------------------------------------------
+// DATA CLASS SharpInfo
+// --------------------------------------------------------------------------
 data class SharpInfo (
     val value: Int,
     val desc: String
@@ -423,6 +417,7 @@ data class SharpInfo (
 // --------------------------------------------------------------------------
 object Settings {
 
+    // Photo Settings
     var photoBackCamera = true
     var photoBeepEnabled = true
     var photoDelayBeepEnabled = false
@@ -433,12 +428,14 @@ object Settings {
     var delayBetweenPhotos = 400L    // (in ms)
     var photoPath = "Pictures/AstroPhoto"
 
+    // Video Settings
     var videoStartBeepEnabled = true
     var videoStopBeepEnabled = true
     var videoDelayBeepEnabled = false
     var videoBeepDelay = 5
     var videoPath = Environment.DIRECTORY_MOVIES!!
 
+    // Stacker settings
     var stackerBeepEnabled = true
     var stackerMaxShift = 10
     var stackerAreaPercentage = 25

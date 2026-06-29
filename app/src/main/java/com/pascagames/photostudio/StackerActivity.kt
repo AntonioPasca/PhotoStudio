@@ -223,7 +223,8 @@ class StackerActivity : ComponentActivity() {
             Stack(
                 context,
                 onImageShifting = {message = "Image shifted"},
-                onImagesShifting = {message = "Images shifted"})
+                onImagesShifting = {message = "Images shifted"}
+            )
             doStacking = false
         }
 

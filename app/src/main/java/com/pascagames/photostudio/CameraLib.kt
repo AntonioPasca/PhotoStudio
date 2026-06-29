@@ -13,22 +13,30 @@
 //
 // Module:      CameraLib.kt
 // --------------------------------------------------------------------------
-// Public Methods
-//      fun bitmapToByteArray(bmp: Bitmap): ByteArray
-//      fun CameraPreview(controller: LifecycleCameraController, modifier: Modifier)
-//      fun fixBitmapRotation(path: String): Bitmap
-//      fun floatArrayToBitmap(buffer: FloatArray, width: Int, height: Int): Bitmap
-//      fun getAudioPermission(): Boolean
-//      fun getCameraPermission(): Boolean
+//  CAMERA HANDLING
+//      fun startCam()
+//      fun shutdown
+//      fun getAudioPermission()
+//      fun getAudioPermission()
 //      fun isRawSupported(context: Context, cameraId: String): Boolean
 //      suspend fun listAvailableCameras(context: Context): List<Pair<String, String>>
-//      fun takePhoto(context: Context, controller: LifecycleCameraController)
 //      fun rememberCameraController(context: Context): LifecycleCameraController
-//      fun saveBitmapToGallery()
+//
+// PHOTO FUNCTIONS
+//      fun CameraPreview(controller: LifecycleCameraController, modifier: Modifier)
+//      fun takePhoto(context: Context, controller: LifecycleCameraController)
+//
+// VIDEO FUNCTIONS
 //      fun startRecording(controller: LifecycleCameraController, context: Context,
 //              onRecStarted: () -> Unit,
 //              onRecFinished: () -> Unit): Recording
 //      fun stopRecording(recording: Recording?)
+//
+// IMAGE HANDLING
+//      fun bitmapToByteArray(bmp: Bitmap): ByteArray
+//      fun fixBitmapRotation(path: String): Bitmap
+//      fun floatArrayToBitmap(buffer: FloatArray, width: Int, height: Int): Bitmap
+//      fun saveBitmapToGallery()
 // --------------------------------------------------------------------------
 package com.pascagames.photostudio
 
@@ -78,7 +86,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.set
 import androidx.core.graphics.createBitmap
 import android.hardware.camera2.CameraManager
-import android.util.Log
+import android.media.MediaRecorder
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
@@ -86,6 +94,8 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 const val PHOTO_JPEG = 0
 const val PHOTO_RAW  = 1
@@ -95,148 +105,26 @@ const val PHOTO_RAW  = 1
 // ----------------------------------------------------------------------
 class CameraLib {
 
+    lateinit var cameraExecutor: ExecutorService
+
     // ----------------------------------------------------------------------
-    // bitmapToByteArray
+    //                      CAMERA HANDLING
     // ----------------------------------------------------------------------
-    fun bitmapToByteArray(bmp: Bitmap): ByteArray {
-        val w = bmp.width
-        val h = bmp.height
-        val total = w * h
 
-        val result = ByteArray(total)
-        val rowPixels = IntArray(w)
+    // ----------------------------------------------------------------------
+    // startCam
+    // ----------------------------------------------------------------------
+    fun startCam() {
 
-        var index = 0
-
-        for (y in 0 until h) {
-            bmp.getPixels(rowPixels, 0, w, 0, y, w, 1)
-
-            for (x in 0 until w) {
-                val p = rowPixels[x]
-                val r = (p shr 16) and 0xFF
-                val g = (p shr 8) and 0xFF
-                val b = p and 0xFF
-                val gray = ((r + g + b) / 3)
-                result[index++] = gray.toByte()
-            }
-        }
-        return result
+        cameraExecutor = Executors.newSingleThreadExecutor()
     }
 
     // ----------------------------------------------------------------------
-    // CameraPreview
+    // shutdown
     // ----------------------------------------------------------------------
-    @Composable
-    fun CameraPreview(
-        controller: LifecycleCameraController,
-        modifier: Modifier,
-        focusPeakingBitmap: Bitmap? // <- to the analyzer
-    ) {
-        val zoomState: ZoomState? by controller.zoomState.observeAsState()
-        val context = LocalContext.current
-        
-        // PreviewView stabile
-        val previewView = remember {
-            PreviewView(context).apply {
-                this.controller = controller
-                scaleType = PreviewView.ScaleType.FILL_CENTER
-            }
-        }
+    fun shutdown() {
 
-        Box(modifier = Modifier.fillMaxSize()) {
-
-            // PREVIEW CAMERA
-            AndroidView(
-                factory = { context ->
-                    PreviewView(context).apply {
-                        this.controller = controller
-                        scaleType = PreviewView.ScaleType.FILL_CENTER
-                    }
-                },
-                modifier = modifier.fillMaxSize()
-            )
-
-            // Overlay Focus peaking
-            if (focusPeakingBitmap != null) {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { context ->
-                        FocusPeakingView(context)
-                    },
-                    update = { view ->
-                        view.edges = focusPeakingBitmap
-                        view.invalidate()
-                    }
-                )
-            }
-
-            // Slider Zoom
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(24.dp)
-            ) {
-                Slider(
-                    value = zoomState?.linearZoom ?: 0f,
-                    onValueChange = { controller.setLinearZoom(it) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Text(
-                    text = "Zoom: ${"%.1f".format(zoomState?.zoomRatio ?: 1f)}x",
-                    color = Color.White,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-            }
-        }
-    }
-
-    // ----------------------------------------------------------------------
-    // fixBitmapRotation
-    // ----------------------------------------------------------------------
-    fun fixBitmapRotation(path: String): Bitmap {
-
-        val bmp = BitmapFactory.decodeFile(path)
-        val exif = ExifInterface(path)
-        val orientation = exif.getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_NORMAL
-        )
-
-        val matrix = Matrix()
-
-        when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
-            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
-            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
-            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.preScale(-1f, 1f)
-            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.preScale(1f, -1f)
-            else -> return bmp   // Rotation not needed
-        }
-
-        val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
-        bmp.recycle()       // 🔥 free memory
-        return rotated
-    }
-
-    // ----------------------------------------------------------------------
-    // floatArrayToBitmap
-    // ----------------------------------------------------------------------
-    // Create a bitmap from a FloatArray
-    // ----------------------------------------------------------------------
-    fun floatArrayToBitmap(buffer: FloatArray, width: Int, height: Int): Bitmap {
-
-        val bmp = createBitmap(width, height)
-
-        var i = 0
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val v = buffer[i++].coerceIn(0f, 255f).toInt()
-                val color = android.graphics.Color.rgb(v, v, v)
-                bmp[x, y] = color
-            }
-        }
-        return bmp
+        cameraExecutor.shutdown()
     }
 
     // ----------------------------------------------------------------------
@@ -358,8 +246,6 @@ class CameraLib {
         val controller = remember {
             LifecycleCameraController(context).apply {
                 cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-                Log.v(TAG, "rCC")
-                Log.v(TAG, cameraSelector.toString())
                 if (!Settings.photoBackCamera)
                     cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
                 setEnabledUseCases(
@@ -371,6 +257,90 @@ class CameraLib {
         }
         controller.isPinchToZoomEnabled = true
         return controller
+    }
+
+    // ----------------------------------------------------------------------
+    // selectCamera
+    // ----------------------------------------------------------------------
+    fun selectCamera(controller: LifecycleCameraController) {
+
+        controller.cameraSelector =
+            if (Settings.photoBackCamera)
+                CameraSelector.DEFAULT_BACK_CAMERA
+            else
+                CameraSelector.DEFAULT_FRONT_CAMERA
+    }
+
+    // ----------------------------------------------------------------------
+    //                      PHOTO FUNCTIONS
+    // ----------------------------------------------------------------------
+
+    // ----------------------------------------------------------------------
+    // CameraPreview
+    // ----------------------------------------------------------------------
+    @Composable
+    fun CameraPreview(
+        controller: LifecycleCameraController,
+        modifier: Modifier,
+        focusPeakingBitmap: Bitmap? // <- to the analyzer
+    ) {
+        val zoomState: ZoomState? by controller.zoomState.observeAsState()
+        val context = LocalContext.current
+
+        // PreviewView stabile
+        val previewView = remember {
+            PreviewView(context).apply {
+                this.controller = controller
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+
+            // PREVIEW CAMERA
+            AndroidView(
+                factory = { context ->
+                    PreviewView(context).apply {
+                        this.controller = controller
+                        scaleType = PreviewView.ScaleType.FILL_CENTER
+                    }
+                },
+                modifier = modifier.fillMaxSize()
+            )
+
+            // Overlay Focus peaking
+            if (focusPeakingBitmap != null) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { context ->
+                        FocusPeakingView(context)
+                    },
+                    update = { view ->
+                        view.edges = focusPeakingBitmap
+                        view.invalidate()
+                    }
+                )
+            }
+
+            // Slider Zoom
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(24.dp)
+            ) {
+                Slider(
+                    value = zoomState?.linearZoom ?: 0f,
+                    onValueChange = { controller.setLinearZoom(it) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    text = "Zoom: ${"%.1f".format(zoomState?.zoomRatio ?: 1f)}x",
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+            }
+        }
     }
 
     // ----------------------------------------------------------------------
@@ -430,37 +400,8 @@ class CameraLib {
     }
 
     // ----------------------------------------------------------------------
-    // saveBitmapToGallery
+    //                      VIDEO FUNCTIONS
     // ----------------------------------------------------------------------
-    fun saveBitmapToGallery(
-        context: Context,
-        bitmap: Bitmap,
-        filename: String = "stacked_${System.currentTimeMillis()}.jpg",
-        folder: String
-    ): Uri? {
-
-        val contentValues = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
-            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, folder)
-            put(MediaStore.Images.Media.IS_PENDING, 1)
-        }
-
-        val uri = context.contentResolver.insert(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            contentValues
-        ) ?: return null
-
-        context.contentResolver.openOutputStream(uri)?.use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
-        }
-
-        contentValues.clear()
-        contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
-        context.contentResolver.update(uri, contentValues, null, null)
-
-        return uri
-    }
 
     // ----------------------------------------------------------------------
     // startRecording
@@ -515,5 +456,118 @@ class CameraLib {
             beep(100, 200)
 
         recording?.stop()
+    }
+
+    // ----------------------------------------------------------------------
+    //                      IMAGE HANDLING
+    // ----------------------------------------------------------------------
+
+    // ----------------------------------------------------------------------
+    // bitmapToByteArray
+    // ----------------------------------------------------------------------
+    fun bitmapToByteArray(bmp: Bitmap): ByteArray {
+        val w = bmp.width
+        val h = bmp.height
+        val total = w * h
+
+        val result = ByteArray(total)
+        val rowPixels = IntArray(w)
+
+        var index = 0
+
+        for (y in 0 until h) {
+            bmp.getPixels(rowPixels, 0, w, 0, y, w, 1)
+
+            for (x in 0 until w) {
+                val p = rowPixels[x]
+                val r = (p shr 16) and 0xFF
+                val g = (p shr 8) and 0xFF
+                val b = p and 0xFF
+                val gray = ((r + g + b) / 3)
+                result[index++] = gray.toByte()
+            }
+        }
+        return result
+    }
+
+    // ----------------------------------------------------------------------
+    // fixBitmapRotation
+    // ----------------------------------------------------------------------
+    fun fixBitmapRotation(path: String): Bitmap {
+
+        val bmp = BitmapFactory.decodeFile(path)
+        val exif = ExifInterface(path)
+        val orientation = exif.getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL
+        )
+
+        val matrix = Matrix()
+
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.preScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.preScale(1f, -1f)
+            else -> return bmp   // Rotation not needed
+        }
+
+        val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+        bmp.recycle()       // 🔥 free memory
+        return rotated
+    }
+
+    // ----------------------------------------------------------------------
+    // floatArrayToBitmap
+    // ----------------------------------------------------------------------
+    // Create a bitmap from a FloatArray
+    // ----------------------------------------------------------------------
+    fun floatArrayToBitmap(buffer: FloatArray, width: Int, height: Int): Bitmap {
+
+        val bmp = createBitmap(width, height)
+
+        var i = 0
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val v = buffer[i++].coerceIn(0f, 255f).toInt()
+                val color = android.graphics.Color.rgb(v, v, v)
+                bmp[x, y] = color
+            }
+        }
+        return bmp
+    }
+
+    // ----------------------------------------------------------------------
+    // saveBitmapToGallery
+    // ----------------------------------------------------------------------
+    fun saveBitmapToGallery(
+        context: Context,
+        bitmap: Bitmap,
+        filename: String = "stacked_${System.currentTimeMillis()}.jpg",
+        folder: String
+    ): Uri? {
+
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, folder)
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+        }
+
+        val uri = context.contentResolver.insert(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            contentValues
+        ) ?: return null
+
+        context.contentResolver.openOutputStream(uri)?.use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
+        }
+
+        contentValues.clear()
+        contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+        context.contentResolver.update(uri, contentValues, null, null)
+
+        return uri
     }
 }

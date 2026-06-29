@@ -21,20 +21,14 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
-import android.hardware.camera2.CameraMetadata.NOISE_REDUCTION_MODE_OFF
-import android.hardware.camera2.CaptureRequest
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.OptIn
-import androidx.camera.camera2.impl.StillCaptureRequestControl
-import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.view.CameraController
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -65,8 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.io.File
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import androidx.compose.foundation.Canvas
 import kotlin.math.max
 
@@ -77,7 +69,6 @@ class PhotoActivity : ComponentActivity() {
 
     private var backToCaller: (Unit) -> Unit = { back() }
     private lateinit var cameraLib: CameraLib
-    private lateinit var cameraExecutor: ExecutorService
     private var controller: LifecycleCameraController? = null
 
     // ----------------------------------------------------------------------
@@ -89,22 +80,7 @@ class PhotoActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         cameraLib = CameraLib()
-        cameraExecutor = Executors.newSingleThreadExecutor()
-
-        ////                NOTA                            ///
-        // 1.   SPOSTARE QUESTA PARTE In CameraLib
-        //      da utilizzare anche in VideoActivity
-        //      startCamera() -> controller
-        //
-        // 2- Update cameraSelector portare anceh in cameraLib
-        controller = LifecycleCameraController(this).apply {
-            cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-            setEnabledUseCases(
-                CameraController.IMAGE_CAPTURE or
-                CameraController.VIDEO_CAPTURE or
-                CameraController.IMAGE_ANALYSIS
-            )
-        }
+        cameraLib.startCam()
 
         // QUI dentro aggiungi Camera2Interop
         // Non sembrano avere effetto
@@ -131,17 +107,13 @@ class PhotoActivity : ComponentActivity() {
         if (Settings.photoRawEnabled)
             title = "Photo (Raw Format)"
 
+        // Update camera
+        if (controller != null)
+            cameraLib.selectCamera(controller!!)
+
         val actions = listOf(
             TopBarAction.Settings { settings() },
         )
-
-        // Update camera
-        controller?.cameraSelector =
-            if (Settings.photoBackCamera)
-                CameraSelector.DEFAULT_BACK_CAMERA
-            else
-                CameraSelector.DEFAULT_FRONT_CAMERA
-
         setContent {
             PhotoStudioTheme {
                 Scaffold(topBar = { TopBarEx(title, actions, backToCaller) })  {
@@ -157,7 +129,7 @@ class PhotoActivity : ComponentActivity() {
     // --------------------------------------------------------------------------
     override fun onDestroy() {
         super.onDestroy()
-        cameraExecutor.shutdown()
+        cameraLib.shutdown()
     }
 
     // --------------------------------------------------------------------------
@@ -186,19 +158,22 @@ class PhotoActivity : ComponentActivity() {
     fun MainScreen(
         modifier: Modifier = Modifier,
     ) {
-        val lifecycleOwner = LocalLifecycleOwner.current
+        val context = LocalContext.current
+        controller = cameraLib.rememberCameraController(context)
 
         // UI States
         var doSinglePhoto by remember { mutableStateOf(false) }
         var doMultiplePhotos by remember { mutableStateOf(false) }
         var doDarks by remember { mutableStateOf(false) }
         var doFocus by remember { mutableStateOf(false) }
+        var doHistogram by remember {mutableStateOf(Settings.photoShowHistogram)}
 
         // Overlay states
         val focusPeakingBitmap = remember { mutableStateOf<Bitmap?>(null) }
         val histogram = remember { mutableStateOf(FloatArray(256)) }
 
         // Bind controller to lifecycle
+        val lifecycleOwner = LocalLifecycleOwner.current
         LaunchedEffect(Unit) {
             controller?.bindToLifecycle(lifecycleOwner)
         }
@@ -206,14 +181,19 @@ class PhotoActivity : ComponentActivity() {
         // Combined Analyzer (Focus + Histogram)
         LaunchedEffect(Unit) {
             controller?.setImageAnalysisAnalyzer(
-                cameraExecutor,
+                cameraLib.cameraExecutor,
                 CombinedAnalyzer(
                     onFocusPeaking = { bmp ->
                         if (doFocus) focusPeakingBitmap.value = bmp
                         else focusPeakingBitmap.value = null
                     },
-                    onHistogram = { hist ->
+                    /*onHistogram = { hist ->
                         histogram.value = hist
+                    }*/
+
+                    onHistogram = { hist ->
+                        if (doHistogram) histogram.value = hist
+                        //else histogram.value = 0.0
                     }
                 )
             )
@@ -282,6 +262,7 @@ class PhotoActivity : ComponentActivity() {
                 )
 
                 // Histogram overlay
+                Log.v(TAG, "Histo")
                 if (Settings.photoShowHistogram) {
                     Box(
                         modifier = Modifier
